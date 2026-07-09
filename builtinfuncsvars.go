@@ -14,7 +14,47 @@ import (
 	"github.com/elliotchance/orderedmap/v3"
 )
 
+func makeStructObjectFromStructure(structure *yks.Structure, fields []*yks.Field) *yks.StructObject {
+	structObject := &yks.StructObject{
+		Identifier: structure.Identifier,
+
+		Fields:  fields,
+		Methods: []*yks.Method{},
+
+		LastMem: []byte{},
+	}
+
+	for _, field := range structure.Fields {
+		if field.Method {
+			structObject.Methods = append(structObject.Methods, &yks.Method{
+				Identifier: "test",
+				Func: &yks.Cell{
+					FuncValue: field.Func,
+				},
+			})
+		}
+	}
+
+	return structObject
+}
+
 var (
+	gameYKSStructure = &yks.Structure{
+		Identifier: "Game",
+		Fields: []*yks.FieldDecl{
+			{
+				Identifier: "test",
+				DataType:   "func",
+				Method:     true,
+				Func: yks.NewFTemp("test", func(v ...any) []any {
+					fmt.Println("Testing built in structure")
+
+					return []any{}
+				}),
+			},
+		},
+	}
+
 	builtinVals = map[string]any{
 		"OS_NAME": func(v ...any) []any {
 			return []any{runtime.GOOS}
@@ -276,30 +316,8 @@ var (
 			}
 		},
 
+		"Game": gameYKSStructure,
 
-		"Game": &yks.Structure{
-			Identifier: "Game",
-			Fields: []*yks.FieldDecl{
-				{
-					Identifier: "test",
-					DataType: "func",
-					Method: true,
-					Func: yks.NewFTemp("test", func(v ...any) []any {
-						fmt.Println("Testing built in structure")
-
-						return []any{}
-					}),
-				},
-			},
-		},
-
-		"game": &yks.StructObject{
-			Identifier: "Game",
-
-			Fields: []*yks.Field{},
-			Methods: []*yks.Method{},
-
-			LastMem: []byte{},
-		},
+		"game": makeStructObjectFromStructure(gameYKSStructure, []*yks.Field{}),
 	}
 )

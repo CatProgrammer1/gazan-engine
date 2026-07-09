@@ -247,7 +247,7 @@ var funcCallTemp *yks.FuncCall = &yks.FuncCall{}
 
 func (game *Game) Update() {
 	for _, script := range game.Scripts {
-		update, ok := script.CurrentScope.Data["update"]
+		update, ok := script.CurrentScope.Data["Update"]
 		if ok && update.FuncValue != nil {
 			funcCallTemp.Func = update.FuncValue
 

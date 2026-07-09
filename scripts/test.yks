@@ -1,5 +1,5 @@
 
 
-func update() {
-    print("sigma lol")
+func Update() {
+    print(game)
 }
