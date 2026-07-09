@@ -1,0 +1,3 @@
+[submodule "yarik-sharp"]
+	path = yarik-sharp
+	url = https://github.com/CatProgrammer1/yarik-sharp
