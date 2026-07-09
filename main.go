@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"gl/yks"
 	"log"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -29,6 +31,8 @@ func checkGLError(where string) {
 }
 
 var (
+	mainGame *Game
+
 	meshesToLoad = []string{
 		"shit/hata.glb",
 		"shit/cube_metal.glb",
@@ -47,6 +51,8 @@ var (
 )
 
 const (
+	scriptsDir = "scripts"
+
 	vertexStride = int32(unsafe.Sizeof(Vertex{}))
 )
 
@@ -407,7 +413,7 @@ func main() {
 		}
 	}()
 
-	game := newGame(window)
+	mainGame = newGame(window)
 
 	//moveSpeed := float32(1)
 
@@ -438,25 +444,25 @@ func main() {
 
 	borderColor := [4]float32{1, 1, 1, 1}
 
-	game.ShadowMaps = []ShadowMap{
+	mainGame.ShadowMaps = []ShadowMap{
 		newShadowMap(shaderProgramDepth, "shadowMapArray1", maxShadowResolution, 1, gl.TEXTURE10, borderColor),
 		newShadowMapCubeMap(shaderProgramDepthP, "shadowMapArray3", maxShadowResolution/6, 1, gl.TEXTURE12),
 		newShadowMap(shaderProgramDepth, "shadowMapArray2", maxShadowResolution/3, 10, gl.TEXTURE11, borderColor),
 	}
 
-	game.ShaderPrograms = []ShaderProgram{
+	mainGame.ShaderPrograms = []ShaderProgram{
 		shaderProgram,
 	}
-	game.SpotLightSources = lightSources.GetType(2)
-	game.PointLightSources = lightSources.GetType(1)
-	game.DirLightSources = lightSources.GetType(0)
+	mainGame.SpotLightSources = lightSources.GetType(2)
+	mainGame.PointLightSources = lightSources.GetType(1)
+	mainGame.DirLightSources = lightSources.GetType(0)
 
-	game.LightTypeShadowMapIndex[0] = 0
-	game.LightTypeShadowMapIndex[1] = 1
-	game.LightTypeShadowMapIndex[2] = 2
+	mainGame.LightTypeShadowMapIndex[0] = 0
+	mainGame.LightTypeShadowMapIndex[1] = 1
+	mainGame.LightTypeShadowMapIndex[2] = 2
 
 	mainWorkspace := &Workspace{
-		Game: game,
+		Game: mainGame,
 
 		UseShadowMaps: true,
 
@@ -480,10 +486,10 @@ func main() {
 
 	mainWorkspace.SetCustomUniform("environment", skyboxTex)
 
-	game.Workspaces = append(game.Workspaces, mainWorkspace)
+	mainGame.Workspaces = append(mainGame.Workspaces, mainWorkspace)
 
-	game.Workspaces = append(game.Workspaces, &Workspace{
-		Game: game,
+	mainGame.Workspaces = append(mainGame.Workspaces, &Workspace{
+		Game: mainGame,
 		Enable: []uint32{
 			gl.DEPTH_TEST,
 		},
@@ -503,7 +509,41 @@ func main() {
 		CustomUniforms: make(map[string]*CustomUniform),
 	})
 
-	game.PostProcess = make([]*PostProcess, len(postProcessShaderPrograms))
+	mainGame.PostProcess = make([]*PostProcess, len(postProcessShaderPrograms))
+
+	scripts_entries, err := os.ReadDir(scriptsDir)
+	handle(err)
+
+	if len(scripts_entries) > 0 {
+		lexer := yks.NewLexer("", "")
+		parser := yks.NewParser("", nil)
+
+		for _, entry := range scripts_entries {
+			name := entry.Name()
+
+			path := filepath.Join(scriptsDir, name)
+
+			content, err := os.ReadFile(path)
+			handle(err)
+
+			lexer.CurrentFileName = name
+			lexer.Source = string(content)
+
+			lexer.LoadSourceChars()
+
+			tokens := lexer.GetTokens()
+
+			parser.Tokens = tokens
+			parser.CurrentFileName = name
+
+			ast := parser.AST()
+
+			interpreter := yks.NewInterpreter(name, ast)
+			interpreter.Complete(false, builtinVals)
+
+			mainGame.Scripts = append(mainGame.Scripts, interpreter)
+		}
+	}
 
 	w, h := window.GetSize()
 
@@ -513,10 +553,10 @@ func main() {
 
 	for i, shaderProgram := range postProcessShaderPrograms {
 		if i == 0 {
-			game.PostProcess[i] = newPostProcess(shaderProgram, &ppFBOs[i%2], &mainPPTexture, gl.TEXTURE0)
+			mainGame.PostProcess[i] = newPostProcess(shaderProgram, gl.TEXTURE0)
 			continue
 		}
-		game.PostProcess[i] = newPostProcess(shaderProgram, &ppFBOs[i%2], &ppTextures[1-i%2], gl.TEXTURE0)
+		mainGame.PostProcess[i] = newPostProcess(shaderProgram, gl.TEXTURE0)
 	}
 
 	for !window.ShouldClose() {
@@ -546,7 +586,7 @@ func main() {
 
 		gamef()
 
-		game.Update()
+		mainGame.Update()
 
 		window.SwapBuffers()
 		glfw.PollEvents()

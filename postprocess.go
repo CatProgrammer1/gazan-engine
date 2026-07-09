@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/go-gl/gl/v4.3-core/gl"
+
+	
 )
 
 var (
@@ -106,11 +108,7 @@ func initPostProcessing(w, h int32) {
 
 type PostProcess struct {
 	ShaderProgram ShaderProgram
-
-	FBO     *uint32
-	Texture *uint32
-
-	TextureUnit uint32
+	TextureUnit   uint32
 }
 
 func (postProcess PostProcess) Bind(uniform string) {
@@ -119,12 +117,10 @@ func (postProcess PostProcess) Bind(uniform string) {
 	gl.Uniform1i(shaderProgram.GetUniformLocation(uniform), int32(postProcess.TextureUnit-gl.TEXTURE0))
 }
 
-func newPostProcess(shaderProgram ShaderProgram, fbo, texture *uint32, textureUnit uint32) *PostProcess {
+func newPostProcess(shaderProgram ShaderProgram, textureUnit uint32) *PostProcess {
 	postProcess := &PostProcess{}
 
 	postProcess.ShaderProgram = shaderProgram
-	postProcess.FBO = fbo
-	postProcess.Texture = texture
 	postProcess.TextureUnit = textureUnit
 
 	return postProcess

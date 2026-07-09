@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"gl/yks"
 	"log"
 
 	"github.com/go-gl/gl/v4.3-core/gl"
@@ -171,10 +172,13 @@ func newGame(window *glfw.Window) *Game {
 		LightTypeShadowMapIndex: make(map[int32]int),
 		DirLightSources:         []*Light{},
 		SpotLightSources:        []*Light{},
+		PointLightSources:       []*Light{},
 
 		ShadowMaps:     []ShadowMap{},
 		ShaderPrograms: []ShaderProgram{},
 		Workspaces:     []*Workspace{},
+
+		PostProcess: []*PostProcess{},
 
 		sm_indeces: make(map[int32]int32),
 	}
@@ -207,6 +211,8 @@ type Game struct {
 
 	Workspaces []*Workspace
 
+	Scripts []*yks.Interpreter
+
 	sm_indeces map[int32]int32
 }
 
@@ -214,7 +220,41 @@ var (
 	moveSpeed float32
 )
 
+func (game *Game) AddLightSrc(light *Light) {
+	switch light.Type {
+	case 0:
+		game.DirLightSources = append(game.DirLightSources, light)
+	case 1:
+		game.PointLightSources = append(game.PointLightSources, light)
+	case 2:
+		game.SpotLightSources = append(game.SpotLightSources, light)
+	}
+}
+
+func (game *Game) AddWorkspace(workspace *Workspace) {
+	game.Workspaces = append(game.Workspaces, workspace)
+}
+
+func (game *Game) AddShadowMap(shadowMap ShadowMap) {
+	game.ShadowMaps = append(game.ShadowMaps, shadowMap)
+}
+
+func (game *Game) AddShaderProgram(shaderProgram ShaderProgram) {
+	game.ShaderPrograms = append(game.ShaderPrograms, shaderProgram)
+}
+
+var funcCallTemp *yks.FuncCall = &yks.FuncCall{}
+
 func (game *Game) Update() {
+	for _, script := range game.Scripts {
+		update, ok := script.CurrentScope.Data["update"]
+		if ok && update.FuncValue != nil {
+			funcCallTemp.Func = update.FuncValue
+
+			script.CompleteNode(funcCallTemp)
+		}
+	}
+
 	window := game.window
 
 	camera := game.Camera
@@ -295,6 +335,10 @@ func (game *Game) Update() {
 		gl.FramebufferTexture(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, pointLightShadowMap.DepthMap, 0)
 
 		for i, lightSource := range game.PointLightSources {
+			if i+1 > int(pointLightShadowMap.Layers) {
+				log.Printf("Too many light sources - %d, and too few layers in shadow map - %d.\n", len(game.PointLightSources), pointLightShadowMap.Layers)
+				break
+			}
 			lightSource.UpdateLightSpaceMatrix(camera)
 
 			gl.Uniform1f(smShaderProgram.GetUniformLocation("far_plane"), lightSource.MaxDistance)
@@ -321,6 +365,10 @@ func (game *Game) Update() {
 		gl.Clear(gl.DEPTH_BUFFER_BIT)
 
 		for i, lightSource := range game.SpotLightSources {
+			if i+1 > int(spotLightShadowMap.Layers) {
+				log.Printf("Too many light sources - %d, and too few layers in shadow map - %d.\n", len(game.SpotLightSources), spotLightShadowMap.Layers)
+				break
+			}
 			lightSource.UpdateLightSpaceMatrix(camera)
 
 			gl.UniformMatrix4fv(spotLightShadowMap.ShaderProgram.GetUniformLocation(LightSpaceMatrix), 1, false, &lightSource.LightSpaceMatrix[0][0])
