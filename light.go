@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gl/yks"
 	"math"
 
 	"github.com/go-gl/gl/v4.3-core/gl"
@@ -63,6 +64,67 @@ type Light struct {
 	savedLocations map[uint32][]int32
 
 	OrthoLimits []float32
+
+	ScriptLight *yks.StructObject
+}
+
+func (light *Light) SyncWithScript() {
+	scriptLight := light.ScriptLight
+	if scriptLight == nil || !scriptLight.IsDirty {
+		return
+	}
+	scriptLight.IsDirty = false
+
+	fx, fy, fz := [2]string{"X", "f32"},
+		[2]string{"Y", "f32"},
+		[2]string{"Z", "f32"}
+
+	position := sigmaMustAssert[*yks.StructObject](scriptLight.Get("Position"))
+	position.CheckFormat(
+		fx,
+		fy,
+		fz,
+	)
+
+	posX, posY, posZ := sigmaMustAssert[float32](position.Get("X")),
+		sigmaMustAssert[float32](position.Get("Y")),
+		sigmaMustAssert[float32](position.Get("Z"))
+
+	direction := sigmaMustAssert[*yks.StructObject](scriptLight.Get("Direction"))
+	direction.CheckFormat(
+		fx,
+		fy,
+		fz,
+	)
+
+	dirX, dirY, dirZ := sigmaMustAssert[float32](direction.Get("X")),
+		sigmaMustAssert[float32](direction.Get("Y")),
+		sigmaMustAssert[float32](direction.Get("Z"))
+
+	diffuse := sigmaMustAssert[*yks.StructObject](scriptLight.Get("Diffuse"))
+	diffuse.CheckFormat(
+		fx,
+		fy,
+		fz,
+	)
+
+	difR, difG, difB := sigmaMustAssert[float32](diffuse.Get("X")),
+		sigmaMustAssert[float32](diffuse.Get("Y")),
+		sigmaMustAssert[float32](diffuse.Get("Z"))
+
+	maxDistance := sigmaMustAssert[float32](scriptLight.Get("MaxDistance"))
+
+	innerCutOut := sigmaMustAssert[float32](scriptLight.Get("InnerCutOut"))
+	outerCutOut := sigmaMustAssert[float32](scriptLight.Get("OuterCutOut"))
+
+	light.Position = mgl32.Vec3{posX, posY, posZ}
+	light.Direction = mgl32.Vec3{dirX, dirY, dirZ}
+	light.Diffuse = mgl32.Vec3{difR, difG, difB}
+
+	light.MaxDistance = maxDistance
+
+	light.InnerCutOut = innerCutOut
+	light.OuterCutOut = outerCutOut
 }
 
 func (light *Light) UpdateAttenuationCoefficients() {

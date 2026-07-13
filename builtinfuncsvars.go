@@ -12,6 +12,8 @@ import (
 	"unsafe"
 
 	"github.com/elliotchance/orderedmap/v3"
+	"github.com/go-gl/gl/v4.3-core/gl"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 func makeStructObjectFromStructure(structure *yks.Structure, fields []*yks.Field) *yks.StructObject {
@@ -24,18 +26,51 @@ func makeStructObjectFromStructure(structure *yks.Structure, fields []*yks.Field
 		LastMem: []byte{},
 	}
 
+	method_i := 0
 	for _, field := range structure.Fields {
 		if field.Method {
 			structObject.Methods = append(structObject.Methods, &yks.Method{
-				Identifier: "test",
+				Identifier: field.Identifier,
 				Func: &yks.Cell{
 					FuncValue: field.Func,
 				},
 			})
+			method_i++
 		}
 	}
 
 	return structObject
+}
+
+func sigmaAssertB[T any](v any, ok bool) (T, bool) {
+	t, suc := v.(T)
+	if !suc {
+		return t, false
+	}
+
+	return t, ok
+}
+
+func sigmaAssert[T any](v any, ok bool) (T, bool) {
+	t, suc := v.(T)
+	if !suc {
+		panic("nga damn")
+	}
+
+	return t, ok
+}
+
+func sigmaMustAssert[T any](v any, ok bool) T {
+	t, suc := v.(T)
+	if !suc {
+		panic("nga damn")
+	}
+
+	if !ok {
+		panic("bro shysh")
+	}
+
+	return t
 }
 
 var (
@@ -43,11 +78,320 @@ var (
 		Identifier: "Game",
 		Fields: []*yks.FieldDecl{
 			{
-				Identifier: "test",
+				Identifier: "AddLightSrc",
 				DataType:   "func",
 				Method:     true,
-				Func: yks.NewFTemp("test", func(v ...any) []any {
-					fmt.Println("Testing built in structure")
+
+				//* AddLightSrc
+				Func: yks.NewFTemp("AddLightSrc", func(v ...any) []any {
+					yks.ArgsCheck(v, 1, 1, "Light")
+
+					x, y := v[0].(int), v[1].(int)
+					inter := v[2].(*yks.Interpreter)
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					light := v[0].(*yks.StructObject)
+
+					ok, reason := light.CheckFormat(
+						[2]string{"Type", "i32"},
+
+						[2]string{"Position", "Vec3"},
+						[2]string{"Direction", "Vec3"},
+						[2]string{"Diffuse", "Vec3"},
+
+						[2]string{"MaxDistance", "f32"},
+
+						[2]string{"InnerCutOut", "f32"},
+						[2]string{"OuterCutOut", "f32"},
+					)
+					if !ok {
+						yks.Throw(inter.CurrentFileName, reason, x, y)
+					}
+
+					ltype := sigmaMustAssert[int32](light.Get("Type"))
+
+					light.IsDirty = true
+
+					lightSrc := newLightSource(ltype,
+						//?Diffuse:
+						mgl32.Vec3{},
+						//?Position:
+						mgl32.Vec3{},
+						//?Direction:
+						mgl32.Vec3{},
+						//?MaxDistance:
+						0,
+						//?CutOuts:
+						0, 0,
+					)
+					lightSrc.ScriptLight = light
+
+					lightSrc.SyncWithScript()
+
+					mainGame.AddLightSrc(lightSrc)
+
+					return []any{}
+				}),
+			},
+			{
+				Identifier: "AddMesh",
+				DataType:   "func",
+				Method:     true,
+
+				//* AddMesh
+				Func: yks.NewFTemp("AddMesh", func(v ...any) []any {
+					yks.ArgsCheck(v, 1, 1, "Mesh")
+
+					x, y := v[0].(int), v[1].(int)
+					inter := v[2].(*yks.Interpreter)
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					mesh := v[0].(*yks.StructObject)
+
+					ok, reason := mesh.CheckFormat(
+						[2]string{"Name", "string"},
+					)
+					if !ok {
+						yks.Throw(inter.CurrentFileName, reason, x, y)
+					}
+
+					name := sigmaMustAssert[string](mesh.Get("Name"))
+
+					mesh.IsDirty = true
+
+					origMesh := mainGame.GetMesh(name)
+
+					mainGame.AddMesh(origMesh)
+
+					return []any{}
+				}),
+			},
+			{
+				Identifier: "AddWorkspace",
+				DataType:   "func",
+				Method:     true,
+
+				//* AddWorkspace
+				Func: yks.NewFTemp("AddWorkspace", func(v ...any) []any {
+					yks.ArgsCheck(v, 1, 1, "Workspace")
+
+					x, y := v[0].(int), v[1].(int)
+					inter := v[2].(*yks.Interpreter)
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					workspaceObj := v[0].(*yks.StructObject)
+
+					ok, reason := workspaceObj.CheckFormat(
+						[2]string{"Name", "string"},
+
+						[2]string{"UseShadowMaps", "bool"},
+
+						[2]string{"Enable", "table"},
+						[2]string{"Disable", "table"},
+
+						[2]string{"DepthMask", "bool"},
+						[2]string{"DepthFunc", "u32"},
+
+						[2]string{"Factor", "f32"},
+						[2]string{"Units", "f32"},
+
+						[2]string{"CullFace", "u32"},
+
+						[2]string{"ShaderProgram", "ShaderProgram"},
+
+						[2]string{"Objects", "table"},
+					)
+					if !ok {
+						yks.Throw(inter.CurrentFileName, reason, x, y)
+					}
+
+					name := sigmaMustAssert[string](workspaceObj.Get("Name"))
+
+					useShadowMaps := sigmaMustAssert[bool](workspaceObj.Get("UseShadowMaps"))
+
+					depthMask := sigmaMustAssert[bool](workspaceObj.Get("DepthMask"))
+					depthFunc := sigmaMustAssert[uint32](workspaceObj.Get("DepthFunc"))
+
+					factor := sigmaMustAssert[float32](workspaceObj.Get("Factor"))
+					units := sigmaMustAssert[float32](workspaceObj.Get("Units"))
+
+					cullFace := sigmaMustAssert[uint32](workspaceObj.Get("CullFace"))
+
+					enableMap := sigmaMustAssert[*yks.Map](workspaceObj.Get("Enable"))
+					if enableMap.DataType != "u32" {
+						yks.Throw(inter.CurrentFileName, "Field Enable must be a table with datatype 'u32', not '%s'", x, y, enableMap.DataType)
+					}
+
+					disableMap := sigmaMustAssert[*yks.Map](workspaceObj.Get("Disable"))
+					if disableMap.DataType != "u32" {
+						yks.Throw(inter.CurrentFileName, "Field Disable must be a table with datatype 'u32', not '%s'", x, y, disableMap.DataType)
+					}
+
+					objectsMap := sigmaMustAssert[*yks.Map](workspaceObj.Get("Objects"))
+					if objectsMap.DataType != "any" {
+						yks.Throw(inter.CurrentFileName, "Field Objects must be a table with datatype 'any', not '%s'", x, y, objectsMap.DataType)
+					}
+
+					shaderProgramObj := sigmaMustAssert[*yks.StructObject](workspaceObj.Get("ShaderProgram"))
+					ok, reason = shaderProgramObj.CheckFormat([2]string{"program", "u32"})
+					if !ok {
+						yks.Throw(inter.CurrentFileName, reason, x, y)
+					}
+
+					shaderProgram := ShaderProgram{
+						program: sigmaMustAssert[uint32](shaderProgramObj.Get("program")),
+
+						savedLocations: make(map[string]int32),
+					}
+
+					enable := make([]uint32, enableMap.Len())
+					disable := make([]uint32, disableMap.Len())
+
+					i := 0
+					for _, cell := range enableMap.AllFromFront() {
+						enableFlag := cell.Get().(uint32)
+
+						enable[i] = enableFlag
+						i++
+					}
+
+					i = 0
+					for _, cell := range disableMap.AllFromFront() {
+						disableFlag := cell.Get().(uint32)
+
+						disable[i] = disableFlag
+						i++
+					}
+
+					objects := make(map[string]Object)
+
+					for k := range objectsMap.AllFromFront() {
+						name, ok := k.(string)
+						if !ok {
+							continue
+						}
+
+						object, ok := mainGame.Objects[name]
+						if !ok {
+							warn(fmt.Sprintf("Object '%s' doesn't exist in game's storage. Object was skipped", name))
+							continue
+						}
+
+						object.SyncWithScript()
+
+						objects[name] = object
+					}
+
+					workspace := &Workspace{
+						Name: name,
+
+						Game: mainGame,
+
+						UseShadowMaps: useShadowMaps,
+
+						Enable:  enable,
+						Disable: disable,
+
+						DepthMask: depthMask,
+						DepthFunc: depthFunc,
+
+						Factor: factor,
+						Units:  units,
+
+						CullFace: cullFace,
+
+						ShaderProgram: shaderProgram,
+
+						Objects: objects,
+
+						ScriptWorkspace: workspaceObj,
+					}
+
+					mainGame.AddWorkspace(workspace)
+
+					return []any{}
+				}),
+			},
+			{
+				Identifier: "AddShadowMap",
+				DataType:   "func",
+				Method:     true,
+
+				//* AddShadowMap
+				Func: yks.NewFTemp("AddShadowMap", func(v ...any) []any {
+					yks.ArgsCheck(v, 1, 1, "ShadowMap")
+
+					x, y := v[0].(int), v[1].(int)
+					inter := v[2].(*yks.Interpreter)
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					shadowMapObj := v[0].(*yks.StructObject)
+
+					ok, reason := shadowMapObj.CheckFormat(
+						[2]string{"UniformName", "string"},
+
+						[2]string{"ShaderProgram", "ShaderProgram"},
+
+						[2]string{"Layers", "i32"},
+						[2]string{"Resolution", "i32"},
+
+						[2]string{"TextureUnit", "u32"},
+						[2]string{"DepthMap", "u32"},
+
+						[2]string{"Target", "u32"},
+
+						[2]string{"FBO", "u32"},
+					)
+					if !ok {
+						yks.Throw(inter.CurrentFileName, reason, x, y)
+					}
+
+					uniformName := sigmaMustAssert[string](shadowMapObj.Get("UniformName"))
+
+					layers := sigmaMustAssert[int32](shadowMapObj.Get("Layers"))
+
+					resolution := sigmaMustAssert[int32](shadowMapObj.Get("Resolution"))
+					textureUnit := sigmaMustAssert[uint32](shadowMapObj.Get("TextureUnit"))
+
+					depthMap := sigmaMustAssert[uint32](shadowMapObj.Get("DepthMap"))
+					target := sigmaMustAssert[uint32](shadowMapObj.Get("Target"))
+
+					fbo := sigmaMustAssert[uint32](shadowMapObj.Get("FBO"))
+
+					shaderProgramObj := sigmaMustAssert[*yks.StructObject](shadowMapObj.Get("ShaderProgram"))
+					ok, reason = shaderProgramObj.CheckFormat([2]string{"program", "u32"})
+					if !ok {
+						yks.Throw(inter.CurrentFileName, reason, x, y)
+					}
+
+					shaderProgram := ShaderProgram{
+						program: sigmaMustAssert[uint32](shaderProgramObj.Get("program")),
+
+						savedLocations: make(map[string]int32),
+					}
+
+					shadowMap := ShadowMap{
+						UniformName: uniformName,
+
+						ShaderProgram: shaderProgram,
+
+						Layers: layers,
+
+						Resolution: resolution,
+
+						Target: target,
+
+						FBO:      fbo,
+						DepthMap: depthMap,
+
+						TextureUnit: textureUnit,
+					}
+
+					mainGame.AddShadowMap(shadowMap)
 
 					return []any{}
 				}),
@@ -55,17 +399,457 @@ var (
 		},
 	}
 
-	builtinVals = map[string]any{
-		"OS_NAME": func(v ...any) []any {
-			return []any{runtime.GOOS}
-		},
+	builtinVals = []yks.BuiltinVal{
+		{Key: "LoadMesh", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "string")
 
-		"print": func(v ...any) []any {
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			name := v[0].(string)
+
+			mesh := newMeshFromFile(name, gl.STATIC_DRAW, false, Attribute{0, 3, gl.FLOAT, false, vertexStride, 0},
+				Attribute{1, 3, gl.FLOAT, false, vertexStride, uintptr(3 * 4)},
+				Attribute{2, 2, gl.FLOAT, false, vertexStride, uintptr(6 * 4)},
+				Attribute{3, 4, gl.UNSIGNED_BYTE, false, vertexStride, uintptr(8 * 4)},
+				Attribute{4, 4, gl.FLOAT, false, vertexStride, uintptr(8*4 + 4)},
+				Attribute{5, 4, gl.FLOAT, false, vertexStride, uintptr(12*4 + 4)})
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Mesh"))
+			if !ok {
+				return []any{nil}
+			}
+
+			meshObj := makeStructObjectFromStructure(structure, []*yks.Field{
+				{
+					Identifier: "Name",
+					DataType:   "string",
+
+					Value: yks.CLPTR(inter.CurrentScope, "string", name, x, y),
+				},
+			})
+
+			mesh.ScriptMesh = meshObj
+
+			mainGame.AddMesh(mesh)
+
+			return []any{meshObj}
+		}},
+
+		{Key: "LoadShader", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 2, 2, "string", "u32")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			name := v[0].(string)
+
+			stype := v[1].(uint32)
+
+			shader, ok := newShaderFromFile(name, stype)
+			if !ok {
+				return []any{nil, false}
+			}
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Shader"))
+			if !ok {
+				return []any{nil}
+			}
+
+			shaderObj := makeStructObjectFromStructure(structure, []*yks.Field{
+				{
+					Identifier: "Source",
+					DataType:   "string",
+
+					Value: yks.CLPTR(inter.CurrentScope, "string", shader.Source, x, y),
+				},
+				{
+					Identifier: "Type",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shader.Type, x, y),
+				},
+				{
+					Identifier: "shader",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shader.shader, x, y),
+				},
+			})
+
+			return []any{shaderObj}
+		}},
+
+		{Key: "MakeShaderProgram", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "table")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			shadersMap := v[0].(*yks.Map)
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("ShaderProgram"))
+			if !ok {
+				return []any{nil}
+			}
+
+			shaders := make([]Shader, shadersMap.Len())
+
+			i := -1
+			for _, shaderCell := range shadersMap.AllFromFront() {
+				i++
+				shaderObj, ok := shaderCell.Get().(*yks.StructObject)
+				if !ok {
+					return []any{nil}
+				}
+
+				ok, reason := shaderObj.CheckFormat([2]string{"Source", "string"}, [2]string{"Type", "u32"}, [2]string{"shader", "u32"})
+				if !ok {
+					yks.Throw(inter.CurrentFileName, reason, x, y)
+				}
+
+				shader := Shader{
+					Source: sigmaMustAssert[string](shaderObj.Get("Source")),
+
+					Type:   sigmaMustAssert[uint32](shaderObj.Get("Type")),
+					shader: sigmaMustAssert[uint32](shaderObj.Get("shader")),
+				}
+
+				shaders[i] = shader
+			}
+
+			program, ok := newShaderProgram()
+			if !ok {
+				return []any{nil}
+			}
+
+			program.AttachShaders(true, shaders...)
+			program.Link()
+
+			programObj := makeStructObjectFromStructure(structure, []*yks.Field{
+				{
+					Identifier: "program",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", program.program, x, y),
+				},
+			})
+
+			return []any{programObj}
+		}},
+
+		{Key: "NewShadowMap", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 5, 5, "ShaderProgram", "string", "i32", "i32", "u32")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			shaderProgramObj := v[0].(*yks.StructObject)
+
+			ok, reason := shaderProgramObj.CheckFormat([2]string{"program", "u32"})
+			if !ok {
+				yks.Throw(inter.CurrentFileName, reason, x, y)
+			}
+
+			shaderProgram := ShaderProgram{
+				program: sigmaMustAssert[uint32](shaderProgramObj.Get("program")),
+			}
+
+			uniformName := v[1].(string)
+			resolution := v[2].(int32)
+			layers := v[3].(int32)
+
+			texUnit := v[4].(uint32)
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("ShadowMap"))
+			if !ok {
+				return []any{nil}
+			}
+
+			textureUnit := gl.TEXTURE10 + texUnit
+
+			fmt.Println(textureUnit)
+
+			shadowMap := newShadowMap(shaderProgram, uniformName, resolution, layers, textureUnit, mgl32.Vec4{1, 1, 1, 1})
+
+			shadowMapObj := makeStructObjectFromStructure(structure, []*yks.Field{
+				{
+					Identifier: "UniformName",
+					DataType:   "string",
+
+					Value: yks.CLPTR(inter.CurrentScope, "string", shadowMap.UniformName, x, y),
+				},
+				{
+					Identifier: "ShaderProgram",
+					DataType:   "ShaderProgram",
+
+					Value: yks.CLPTR(inter.CurrentScope, "ShaderProgram", shaderProgramObj, x, y),
+				},
+				{
+					Identifier: "Layers",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", shadowMap.Layers, x, y),
+				},
+				{
+					Identifier: "Resolution",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", shadowMap.Resolution, x, y),
+				},
+				{
+					Identifier: "TextureUnit",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.TextureUnit, x, y),
+				},
+				{
+					Identifier: "DepthMap",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.DepthMap, x, y),
+				},
+				{
+					Identifier: "FBO",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.FBO, x, y),
+				},
+				{
+					Identifier: "Target",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.Target, x, y),
+				},
+			})
+
+			return []any{shadowMapObj}
+		}},
+
+		{Key: "NewMeshObject", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 2, 2, "string", "Mesh")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			name := v[0].(string)
+
+			meshObj := v[1].(*yks.StructObject)
+			ok, reason := meshObj.CheckFormat([2]string{"Name", "string"})
+			if !ok {
+				yks.Throw(inter.CurrentFileName, reason, x, y)
+			}
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("MeshObject"))
+			if !ok {
+				return []any{nil}
+			}
+
+			mesh := mainGame.GetMesh(sigmaMustAssert[string](meshObj.Get("Name")))
+
+			meshObject := newMeshObject(mesh, mgl32.Vec3{}, mgl32.Vec3{1, 1, 1}, mgl32.QuatIdent())
+
+			animationObjMap := &yks.Map{
+				OrderedMap: orderedmap.NewOrderedMap[any, *yks.Cell](),
+				DataType:   "Animation",
+				Pointers:   []any{},
+				Layout:     []string{},
+				Mem:        []byte{},
+			}
+
+			animationStructure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Animation"))
+			if !ok {
+				return []any{nil}
+			}
+
+			vec3Structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Vec3"))
+			if !ok {
+				return []any{nil}
+			}
+
+			quatStructure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Quat"))
+			if !ok {
+				return []any{nil}
+			}
+
+			var positionObj, scaleObj, rotationVec3Obj, rotationObj *yks.StructObject
+			{
+				positionObj = makeStructObjectFromStructure(vec3Structure, []*yks.Field{
+					{
+						Identifier: "X",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+					},
+					{
+						Identifier: "Y",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+					},
+					{
+						Identifier: "Z",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+					},
+				})
+
+				scaleObj = makeStructObjectFromStructure(vec3Structure, []*yks.Field{
+					{
+						Identifier: "X",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
+					},
+					{
+						Identifier: "Y",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
+					},
+					{
+						Identifier: "Z",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
+					},
+				})
+
+				rotationVec3Obj = makeStructObjectFromStructure(vec3Structure, []*yks.Field{
+					{
+						Identifier: "X",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+					},
+					{
+						Identifier: "Y",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+					},
+					{
+						Identifier: "Z",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+					},
+				})
+
+				rotationObj = makeStructObjectFromStructure(quatStructure, []*yks.Field{
+					{
+						Identifier: "V",
+						DataType:   "Vec3",
+
+						Value: yks.CLPTR(inter.CurrentScope, "Vec3", rotationVec3Obj, x, y),
+					},
+					{
+						Identifier: "W",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
+					},
+				})
+			}
+
+			meshObjectObj := makeStructObjectFromStructure(structure, []*yks.Field{
+				{
+					Identifier: "Name",
+					DataType:   "string",
+
+					Value: yks.CLPTR(inter.CurrentScope, "string", name, x, y),
+				},
+				{
+					Identifier: "Mesh",
+					DataType:   "Mesh",
+
+					Value: yks.CLPTR(inter.CurrentScope, "Mesh", meshObj, x, y),
+				},
+				{
+					Identifier: "Position",
+					DataType:   "Vec3",
+
+					Value: yks.CLPTR(inter.CurrentScope, "Vec3", positionObj, x, y),
+				},
+				{
+					Identifier: "Scale",
+					DataType:   "Vec3",
+
+					Value: yks.CLPTR(inter.CurrentScope, "Vec3", scaleObj, x, y),
+				},
+				{
+					Identifier: "Rotation",
+					DataType:   "Quat",
+
+					Value: yks.CLPTR(inter.CurrentScope, "Quat", rotationObj, x, y),
+				},
+			})
+
+			for i, animation := range meshObject.Animations {
+				animationObj := makeStructObjectFromStructure(animationStructure, []*yks.Field{
+					{
+						Identifier: "Mesh",
+						DataType:   "Mesh",
+
+						Value: yks.CLPTR(inter.CurrentScope, "Mesh", meshObj, x, y),
+					},
+					{
+						Identifier: "MeshObject",
+						DataType:   "MeshObject",
+
+						Value: yks.CLPTR(inter.CurrentScope, "MeshObject", meshObjectObj, x, y),
+					},
+
+					{
+						Identifier: "TimeMarker",
+						DataType:   "f32",
+
+						Value: yks.CLPTR(inter.CurrentScope, "f32", animation.TimeMarker, x, y),
+					},
+					{
+						Identifier: "IsPlaying",
+						DataType:   "bool",
+
+						Value: yks.CLPTR(inter.CurrentScope, "bool", animation.IsPlaying, x, y),
+					},
+					{
+						Identifier: "Looped",
+						DataType:   "bool",
+
+						Value: yks.CLPTR(inter.CurrentScope, "bool", animation.Looped, x, y),
+					},
+				})
+
+				animationObjMap.Set(int64(i), yks.CLPTR(inter.CurrentScope, "Animation", animationObj, x, y))
+			}
+
+			meshObject.ScriptMeshObject = meshObjectObj
+
+			mainGame.AddObject(name, meshObject)
+
+			return []any{meshObjectObj}
+		}},
+
+		{Key: "OS_NAME", Val: func(v ...any) []any {
+			return []any{runtime.GOOS}
+		}},
+
+		{Key: "print", Val: func(v ...any) []any {
 			fmt.Println(yks.Format(v[yks.BUILTIN_SPECIALS:]...))
 			return nil
-		},
+		}},
 
-		"delete": func(v ...any) []any {
+		{Key: "delete", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 2, 2, "table", "any")
 
 			v = v[yks.BUILTIN_SPECIALS:]
@@ -75,14 +859,14 @@ var (
 
 			table.Delete(key)
 			return nil
-		},
+		}},
 
-		"sleep": func(v ...any) []any {
+		{Key: "sleep", Val: func(v ...any) []any {
 			x, y := v[0].(int), v[1].(int)
 			inter := v[2].(*yks.Interpreter)
 
 			if len(v) == 0 {
-				throw(inter.CurrentFileName, "Function must have one argument.", x, y)
+				Throw(inter.CurrentFileName, "Function must have one argument.", x, y)
 			}
 
 			v = v[yks.BUILTIN_SPECIALS:]
@@ -95,25 +879,25 @@ var (
 			case uint64, uint32, uint16, uint8:
 				time.Sleep(time.Duration(yks.ToUint64(t) * uint64(time.Millisecond)))
 			default:
-				throw(inter.CurrentFileName, "Time value must be a number.", x, y)
+				Throw(inter.CurrentFileName, "Time value must be a number.", x, y)
 			}
 			return nil
-		},
+		}},
 
-		"throw": func(v ...any) []any {
+		{Key: "Throw", Val: func(v ...any) []any {
 			x, y := v[0].(int), v[1].(int)
 			inter := v[2].(*yks.Interpreter)
 
 			v = v[yks.BUILTIN_SPECIALS:]
 			if len(v) <= 0 {
-				throw(inter.CurrentFileName, "Function requires one or more arguments.", x, y)
+				Throw(inter.CurrentFileName, "Function requires one or more arguments.", x, y)
 			}
 
-			throw(inter.CurrentFileName, yks.Format(v...), x, y)
+			Throw(inter.CurrentFileName, yks.Format(v...), x, y)
 			return nil
-		},
+		}},
 
-		"len": func(v ...any) []any {
+		{Key: "len", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "any")
 			x, y := v[0].(int), v[1].(int)
 			inter := v[2].(*yks.Interpreter)
@@ -136,12 +920,12 @@ var (
 
 				return []any{int64(lastFieldLayout.Offset + lastFieldLayout.Size)}
 			default:
-				throw(inter.CurrentFileName, "Cannot get lenght of non-string, non-table or non-instance value.", x, y)
+				Throw(inter.CurrentFileName, "Cannot get lenght of non-string, non-table or non-instance value.", x, y)
 			}
 			return nil
-		},
+		}},
 
-		"sizeof": func(v ...any) []any {
+		{Key: "sizeof", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "any")
 
 			v = v[yks.BUILTIN_SPECIALS:]
@@ -153,22 +937,22 @@ var (
 			}
 
 			return []any{unsafe.Sizeof(a)}
-		},
+		}},
 
-		"time": func(v ...any) []any {
+		{Key: "time", Val: func(v ...any) []any {
 			return []any{time.Now().UnixMilli()}
-		},
-		"strformat": func(v ...any) []any {
+		}},
+		{Key: "strformat", Val: func(v ...any) []any {
 			return []any{yks.Format(v[yks.BUILTIN_SPECIALS:]...)}
-		},
-		"gettype": func(v ...any) []any {
+		}},
+		{Key: "gettype", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "any")
 
 			v = v[yks.BUILTIN_SPECIALS:]
 
 			return []any{yks.GetValueType(v[0])}
-		},
-		"numformat": func(v ...any) []any {
+		}},
+		{Key: "numformat", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 2, 2, "string", "bool")
 			x, y := v[0].(int), v[1].(int)
 			inter := v[2].(*yks.Interpreter)
@@ -182,25 +966,25 @@ var (
 				n, err := strconv.ParseFloat(str, 64)
 				switch err {
 				case strconv.ErrSyntax:
-					throw(inter.CurrentFileName, "Syntax error while trying to parse number value.", x, y)
+					Throw(inter.CurrentFileName, "Syntax error while trying to parse number value.", x, y)
 				case strconv.ErrRange:
-					throw(inter.CurrentFileName, "Number value is out of range.", x, y)
+					Throw(inter.CurrentFileName, "Number value is out of range.", x, y)
 				}
 				return []any{n}
 			} else {
 				n, err := strconv.ParseInt(str, 0, 64)
 				switch err {
 				case strconv.ErrSyntax:
-					throw(inter.CurrentFileName, "Syntax error while trying to parse number value.", x, y)
+					Throw(inter.CurrentFileName, "Syntax error while trying to parse number value.", x, y)
 				case strconv.ErrRange:
-					throw(inter.CurrentFileName, "Number value is out of range.", x, y)
+					Throw(inter.CurrentFileName, "Number value is out of range.", x, y)
 				}
 
 				return []any{n}
 			}
-		},
+		}},
 
-		"string": func(v ...any) []any {
+		{Key: "string", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "table")
 
 			v = v[yks.BUILTIN_SPECIALS:]
@@ -222,9 +1006,9 @@ var (
 			}
 
 			return []any{string(bstring)}
-		},
+		}},
 
-		"unicodetostr": func(v ...any) []any {
+		{Key: "unicodetostr", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "uint")
 
 			v = v[yks.BUILTIN_SPECIALS:]
@@ -232,9 +1016,9 @@ var (
 			r := rune(yks.ToUint64(v[0]))
 
 			return []any{string(r)}
-		},
+		}},
 
-		"make": func(v ...any) []any {
+		{Key: "make", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 3, 3, "int", "string", "any")
 
 			x, y := v[0].(int), v[1].(int)
@@ -266,9 +1050,9 @@ var (
 			m.ToMemory()
 
 			return []any{m}
-		},
+		}},
 
-		"cstring": func(v ...any) []any {
+		{Key: "cstring", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "string")
 
 			v = v[yks.BUILTIN_SPECIALS:]
@@ -283,9 +1067,9 @@ var (
 			return []any{
 				uintptr(unsafe.Pointer(slicePtr)), err,
 			}
-		},
+		}},
 
-		"bytes": func(v ...any) []any {
+		{Key: "bytes", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "string")
 
 			x, y := v[0].(int), v[1].(int)
@@ -314,10 +1098,10 @@ var (
 			return []any{
 				m,
 			}
-		},
+		}},
 
-		"Game": gameYKSStructure,
+		{Key: "Game", Val: gameYKSStructure},
 
-		"game": makeStructObjectFromStructure(gameYKSStructure, []*yks.Field{}),
+		{Key: "game", Val: makeStructObjectFromStructure(gameYKSStructure, []*yks.Field{})},
 	}
 )

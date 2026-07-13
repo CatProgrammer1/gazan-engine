@@ -34,12 +34,12 @@ var (
 	mainGame *Game
 
 	meshesToLoad = []string{
-		"shit/hata.glb",
+		/*"shit/hata.glb",
 		"shit/cube_metal.glb",
 		"shit/plate.glb",
 		"shit/pig twerk fix 2.glb",
 		"shit/kolt.glb",
-		"shit/artem.glb",
+		"shit/artem.glb",*/
 	}
 
 	workspace = make(map[string]Object)
@@ -176,7 +176,7 @@ func main() {
 		panic(err)
 	}
 
-	skyboxTex := newCubeMapFromFile("shit/sky.png")
+	//skyboxTex := newCubeMapFromFile("shit/sky.png")
 
 	postProcessShaderPrograms := []ShaderProgram{}
 
@@ -417,51 +417,53 @@ func main() {
 
 	//moveSpeed := float32(1)
 
-	lightSources := makeLightContainer(
-		/*newSpotLightSource(
-			mgl32.Vec3{1, .1, 0},
-			mgl32.Vec3{0, 0, -1},
-			mgl32.Vec3{2, 2, 2},
-			30,
-			mgl32.DegToRad(20),
-			mgl32.DegToRad(25),
-		),*/
-		newPointLightSource(mgl32.Vec3{0, 3, 0}, mgl32.Vec3{2, 2, 2}, 10),
-		/*newSpotLightSource(
-			mgl32.Vec3{0, .1, 0},
-			mgl32.Vec3{-1, 0, 0},
-			mgl32.Vec3{2, 2, 2},
-			30,
-			mgl32.DegToRad(20),
-			mgl32.DegToRad(25),
-		),*/
-		//newDirectionalLightSource(mgl32.Vec3{-1, -1, .5}, mgl32.Vec3{2.0, 2.0, 2.0}),
-	)
+	/*lightSources := makeLightContainer(
+	/*newSpotLightSource(
+		mgl32.Vec3{1, .1, 0},
+		mgl32.Vec3{0, 0, -1},
+		mgl32.Vec3{2, 2, 2},
+		30,
+		mgl32.DegToRad(20),
+		mgl32.DegToRad(25),
+	),*/
+	//newPointLightSource(mgl32.Vec3{0, 3, 0}, mgl32.Vec3{2, 2, 2}, 10),
+	/*newSpotLightSource(
+		mgl32.Vec3{0, .1, 0},
+		mgl32.Vec3{-1, 0, 0},
+		mgl32.Vec3{2, 2, 2},
+		30,
+		mgl32.DegToRad(20),
+		mgl32.DegToRad(25),
+	),*/
+	//newDirectionalLightSource(mgl32.Vec3{-1, -1, .5}, mgl32.Vec3{2.0, 2.0, 2.0}),
+	//)
 
 	//maxFPS := float32(1 / 120)
 
-	maxShadowResolution := int32(1024 * 6)
+	//maxShadowResolution := int32(1024 * 6)
 
-	borderColor := [4]float32{1, 1, 1, 1}
+	//borderColor := [4]float32{1, 1, 1, 1}
 
-	mainGame.ShadowMaps = []ShadowMap{
+	/*mainGame.ShadowMaps = []ShadowMap{
 		newShadowMap(shaderProgramDepth, "shadowMapArray1", maxShadowResolution, 1, gl.TEXTURE10, borderColor),
 		newShadowMapCubeMap(shaderProgramDepthP, "shadowMapArray3", maxShadowResolution/6, 1, gl.TEXTURE12),
 		newShadowMap(shaderProgramDepth, "shadowMapArray2", maxShadowResolution/3, 10, gl.TEXTURE11, borderColor),
-	}
+	}*/
 
 	mainGame.ShaderPrograms = []ShaderProgram{
 		shaderProgram,
 	}
-	mainGame.SpotLightSources = lightSources.GetType(2)
-	mainGame.PointLightSources = lightSources.GetType(1)
-	mainGame.DirLightSources = lightSources.GetType(0)
+	//mainGame.SpotLightSources = lightSources.GetType(2)
+	//mainGame.PointLightSources = lightSources.GetType(1)
+	//mainGame.DirLightSources = lightSources.GetType(0)
 
 	mainGame.LightTypeShadowMapIndex[0] = 0
 	mainGame.LightTypeShadowMapIndex[1] = 1
 	mainGame.LightTypeShadowMapIndex[2] = 2
 
-	mainWorkspace := &Workspace{
+	/*mainWorkspace := &Workspace{
+		Name: "main",
+
 		Game: mainGame,
 
 		UseShadowMaps: true,
@@ -489,6 +491,8 @@ func main() {
 	mainGame.Workspaces = append(mainGame.Workspaces, mainWorkspace)
 
 	mainGame.Workspaces = append(mainGame.Workspaces, &Workspace{
+		Name: "skybox",
+
 		Game: mainGame,
 		Enable: []uint32{
 			gl.DEPTH_TEST,
@@ -507,7 +511,7 @@ func main() {
 		},
 
 		CustomUniforms: make(map[string]*CustomUniform),
-	})
+	})*/
 
 	mainGame.PostProcess = make([]*PostProcess, len(postProcessShaderPrograms))
 
@@ -539,7 +543,7 @@ func main() {
 			ast := parser.AST()
 
 			interpreter := yks.NewInterpreter(name, ast)
-			interpreter.Complete(false, builtinVals)
+			interpreter.Complete(false, builtinVals, false)
 
 			mainGame.Scripts = append(mainGame.Scripts, interpreter)
 		}

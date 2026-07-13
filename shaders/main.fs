@@ -23,7 +23,7 @@ in mat3 TBN;
 
 uniform vec3 viewPos;
 
-const vec4 GLOBAL_AMBIENT = vec4(0.25, 0.25, 0.25, 1.0);
+const vec4 GLOBAL_AMBIENT = vec4(0.1, 0.1, 0.1, 1.0);
 
 struct Light {
     int type; //0 - direction light, 1 - point light
@@ -45,9 +45,9 @@ struct Light {
     mat4[6] lightSpaceMatrix;
 };
 
-uniform sampler2DArray shadowMapArray1;
-uniform sampler2DArray shadowMapArray2;
-uniform samplerCubeArray shadowMapArray3;
+uniform sampler2DArray dirShadowMap;
+uniform sampler2DArray spotShadowMap;
+uniform samplerCubeArray pointShadowMap;
 
 #define MAX_LIGHTS 10
 
@@ -277,11 +277,11 @@ void main() {
         if (light.type == 0) {
             vec4 fragPosLightSpace = light.lightSpaceMatrix[0] * vec4(FragPos, 1.0);
 
-            float shadow = CalculateShadow(shadowMapArray1, .5, fragPosLightSpace, norm, -light.direction, dirI);
+            float shadow = CalculateShadow(dirShadowMap, .5, fragPosLightSpace, norm, -light.direction, dirI);
             dirI++;
             result += calcDirLight(light, shadow);
         } else if (light.type == 1) {
-            float shadow = CalculateShadowCube(shadowMapArray3, 10, FragPos, light.position, norm, light.maxDistance, pointI);
+            float shadow = CalculateShadowCube(pointShadowMap, 10, FragPos, light.position, norm, light.maxDistance, pointI);
 
             result += calcPointLight(light, shadow);
 
@@ -289,7 +289,7 @@ void main() {
         } else if (light.type == 2) {
             vec4 fragPosLightSpace = light.lightSpaceMatrix[0] * vec4(FragPos, 1.0);
 
-            float shadow = CalculateShadow(shadowMapArray2, .5, fragPosLightSpace, norm, -light.direction, spotI);
+            float shadow = CalculateShadow(spotShadowMap, .5, fragPosLightSpace, norm, -light.direction, spotI);
             spotI++;
             result += calcSpotLight(light, shadow);
         }

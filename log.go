@@ -6,7 +6,7 @@ func warn(msg ...any) {
 	log.Println(msg...)
 }
 
-func throw(msg ...any) {
+func Throw(msg ...any) {
 	log.Fatalln(msg...)
 }
 

@@ -43,12 +43,11 @@ type Animation struct {
 	IsPlaying  bool
 	Looped     bool
 	LastTime   float32
-	Binding    *BoneBind
 }
 
 func (animation *Animation) Play(currentTime float32) {
 	if animation.MeshObject == nil {
-		throw("Animation must be have a meshObject")
+		Throw("Animation must be have a meshObject")
 	}
 
 	animation.IsPlaying = true
@@ -58,7 +57,7 @@ func (animation *Animation) Play(currentTime float32) {
 
 func (animation *Animation) Update(currentTime float32) {
 	if animation.MeshObject == nil {
-		throw("Animation must be have a meshObject")
+		Throw("Animation must be have a meshObject")
 	}
 
 	document := animation.Document
@@ -140,7 +139,7 @@ func (animation *Animation) Update(currentTime float32) {
 
 func (animation *Animation) GetBone(name string) *BoneInfo {
 	if animation.MeshObject == nil {
-		throw("Animation must be have a meshObject")
+		Throw("Animation must be have a meshObject")
 	}
 	meshObject := animation.MeshObject
 
@@ -163,16 +162,10 @@ func (animation *Animation) getNodeTransforms(node *gltf.Node) []mgl32.Mat4 {
 		transforms[i] = mgl32.Ident4()
 	}
 
-	binding := animation.Binding
-
 	animation.readNodeHierarchy(node, mgl32.Ident4())
 
 	for i, boneInfo := range bonesInfo {
-		if binding != nil && binding.Enabled {
-			transforms[i] = resetScale(binding.HeadBone.GlobalTransformation)
-		} else {
-			transforms[i] = boneInfo.FinalTransformation
-		}
+		transforms[i] = boneInfo.FinalTransformation
 	}
 
 	return transforms

@@ -22,6 +22,8 @@ func (cu *CustomUniform) Set(v any) {
 }
 
 type Workspace struct {
+	Name string
+
 	UseShadowMaps bool
 	Game          *Game
 	//Enables all the given flags at the beginning when Workspace is rendered, and disables them at the end
@@ -42,6 +44,8 @@ type Workspace struct {
 
 	ShaderProgram ShaderProgram
 	Objects       map[string]Object
+
+	ScriptWorkspace *yks.StructObject
 }
 
 func (workspace *Workspace) SetCustomUniform(name string, value any) {
@@ -153,6 +157,8 @@ func (workspace *Workspace) DrawObjects(camera *Camera) {
 	gl.DepthMask(workspace.DepthMask)
 
 	for _, object := range workspace.Objects {
+		object.SyncWithScript()
+
 		object.Draw(shaderProgram, camera)
 	}
 
@@ -177,6 +183,9 @@ func newGame(window *glfw.Window) *Game {
 		ShadowMaps:     []ShadowMap{},
 		ShaderPrograms: []ShaderProgram{},
 		Workspaces:     []*Workspace{},
+
+		Meshes:  []*Mesh{},
+		Objects: make(map[string]Object),
 
 		PostProcess: []*PostProcess{},
 
@@ -209,6 +218,10 @@ type Game struct {
 	DirLightSources   []*Light
 	PointLightSources []*Light
 
+	//To make the object appear in the world you must add it to the workspace, Meshes slice and Objects map are just used to store the instances to get it if needed withouth searching through workspaces
+	Meshes  []*Mesh
+	Objects map[string]Object
+
 	Workspaces []*Workspace
 
 	Scripts []*yks.Interpreter
@@ -228,11 +241,22 @@ func (game *Game) AddLightSrc(light *Light) {
 		game.PointLightSources = append(game.PointLightSources, light)
 	case 2:
 		game.SpotLightSources = append(game.SpotLightSources, light)
+	default:
+		warn("Unexisting light source type. Light source wasn't added to the list.")
 	}
 }
 
 func (game *Game) AddWorkspace(workspace *Workspace) {
 	game.Workspaces = append(game.Workspaces, workspace)
+}
+
+func (game *Game) GetWorkspace(name string) *Workspace {
+	for _, workspace := range game.Workspaces {
+		if workspace.Name == name {
+			return workspace
+		}
+	}
+	return nil
 }
 
 func (game *Game) AddShadowMap(shadowMap ShadowMap) {
@@ -241,6 +265,26 @@ func (game *Game) AddShadowMap(shadowMap ShadowMap) {
 
 func (game *Game) AddShaderProgram(shaderProgram ShaderProgram) {
 	game.ShaderPrograms = append(game.ShaderPrograms, shaderProgram)
+}
+
+func (game *Game) AddMesh(mesh *Mesh) {
+	game.Meshes = append(game.Meshes, mesh)
+}
+
+func (game *Game) AddObject(name string, obj Object) {
+	if _, ok := game.Objects[name]; ok {
+		warn(fmt.Sprintf("Object with name '%s' already exists. Object was not added to a game storage. Expect issues with it not showing up correctly.", name))
+	}
+	game.Objects[name] = obj
+}
+
+func (game *Game) GetMesh(name string) *Mesh {
+	for _, mesh := range game.Meshes {
+		if mesh.Name == name {
+			return mesh
+		}
+	}
+	return nil
 }
 
 var funcCallTemp *yks.FuncCall = &yks.FuncCall{}
@@ -292,9 +336,8 @@ func (game *Game) Update() {
 	w, h := game.window.GetSize()
 
 	dirLightShadowMapINDEX, ok := game.LightTypeShadowMapIndex[0]
-	if ok {
+	if ok && dirLightShadowMapINDEX < len(game.ShadowMaps) {
 		dirLightShadowMap := game.ShadowMaps[dirLightShadowMapINDEX]
-		dirLightShadowMap.shiEvenUsed = len(game.DirLightSources) > 0
 
 		dirLightShadowMap.Bind()
 		gl.Clear(gl.DEPTH_BUFFER_BIT)
@@ -304,6 +347,7 @@ func (game *Game) Update() {
 				log.Printf("Too many light sources - %d, and too few layers in shadow map - %d.\n", len(game.DirLightSources), dirLightShadowMap.Layers)
 				break
 			}
+			lightSource.SyncWithScript()
 			lightSource.UpdateLightSpaceMatrix(camera)
 
 			gl.UniformMatrix4fv(dirLightShadowMap.ShaderProgram.GetUniformLocation(LightSpaceMatrix), 1, false, &lightSource.LightSpaceMatrix[0][0])
@@ -323,9 +367,8 @@ func (game *Game) Update() {
 	}
 
 	pointLightShadowMapINDEX, ok := game.LightTypeShadowMapIndex[1]
-	if ok {
+	if ok && pointLightShadowMapINDEX < len(game.ShadowMaps) {
 		pointLightShadowMap := game.ShadowMaps[pointLightShadowMapINDEX]
-		pointLightShadowMap.shiEvenUsed = len(game.PointLightSources) > 0
 
 		pointLightShadowMap.Bind()
 		gl.Clear(gl.DEPTH_BUFFER_BIT)
@@ -339,6 +382,7 @@ func (game *Game) Update() {
 				log.Printf("Too many light sources - %d, and too few layers in shadow map - %d.\n", len(game.PointLightSources), pointLightShadowMap.Layers)
 				break
 			}
+			lightSource.SyncWithScript()
 			lightSource.UpdateLightSpaceMatrix(camera)
 
 			gl.Uniform1f(smShaderProgram.GetUniformLocation("far_plane"), lightSource.MaxDistance)
@@ -357,9 +401,8 @@ func (game *Game) Update() {
 	}
 
 	spotLightShadowMapINDEX, ok := game.LightTypeShadowMapIndex[2]
-	if ok {
+	if ok && spotLightShadowMapINDEX < len(game.ShadowMaps) {
 		spotLightShadowMap := game.ShadowMaps[spotLightShadowMapINDEX]
-		spotLightShadowMap.shiEvenUsed = len(game.SpotLightSources) > 0
 
 		spotLightShadowMap.Bind()
 		gl.Clear(gl.DEPTH_BUFFER_BIT)
@@ -369,6 +412,7 @@ func (game *Game) Update() {
 				log.Printf("Too many light sources - %d, and too few layers in shadow map - %d.\n", len(game.SpotLightSources), spotLightShadowMap.Layers)
 				break
 			}
+			lightSource.SyncWithScript()
 			lightSource.UpdateLightSpaceMatrix(camera)
 
 			gl.UniformMatrix4fv(spotLightShadowMap.ShaderProgram.GetUniformLocation(LightSpaceMatrix), 1, false, &lightSource.LightSpaceMatrix[0][0])

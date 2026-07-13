@@ -1,12 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/go-gl/gl/v4.3-core/gl"
-
-	
 )
 
 var (
@@ -55,8 +52,6 @@ func initPostProcessing(w, h int32) {
 				panic(status)
 			}
 		}
-
-		fmt.Println(ppFBOs, ppTextures)
 
 		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 		gl.BindTexture(gl.TEXTURE_2D, 0)

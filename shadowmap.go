@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/go-gl/gl/v4.3-core/gl"
@@ -40,7 +39,9 @@ func newShadowMap(shaderProgram ShaderProgram, uniformName string, resolution in
 	gl.ReadBuffer(gl.NONE)
 
 	status := gl.CheckFramebufferStatus(gl.FRAMEBUFFER)
-	fmt.Println(status == gl.FRAMEBUFFER_COMPLETE)
+	if status != gl.FRAMEBUFFER_COMPLETE {
+		log.Fatalln("HERE", status)
+	}
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 
@@ -114,8 +115,6 @@ type ShadowMap struct {
 	DepthMap    uint32
 	Resolution  int32
 	TextureUnit uint32
-
-	shiEvenUsed bool //Determines if this shadowMap is even used, like for example to not bind point light shadowMap if there's no point lights
 }
 
 func (sm ShadowMap) Bind() {

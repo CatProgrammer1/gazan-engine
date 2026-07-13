@@ -1,6 +1,8 @@
 package main
 
 import (
+	"gl/yks"
+
 	"github.com/go-gl/gl/v4.3-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 )
@@ -8,6 +10,7 @@ import (
 type Object interface {
 	Draw(shaderProgram ShaderProgram, camera *Camera)
 	GetModelMatrix() mgl32.Mat4
+	SyncWithScript()
 }
 
 func newMeshObject(mesh *Mesh, position, scale mgl32.Vec3, rotation mgl32.Quat) *MeshObject {
@@ -50,6 +53,8 @@ type MeshObject struct {
 	bonesInfo    []*BoneInfo
 
 	modelMatrix mgl32.Mat4
+
+	ScriptMeshObject *yks.StructObject
 }
 
 // Clones the animation creating an unique copy and then adds it to the MeshObject.Animations slice
@@ -68,6 +73,65 @@ func (mesh *MeshObject) AddAnim(anim *Animation) {
 	parentedAnim.Transforms = []mgl32.Mat4{}
 
 	mesh.Animations = append(mesh.Animations, parentedAnim)
+}
+
+func (mesh *MeshObject) SyncWithScript() {
+	scriptMeshObject := mesh.ScriptMeshObject
+	if scriptMeshObject == nil || !scriptMeshObject.IsDirty {
+		return
+	}
+	scriptMeshObject.IsDirty = false
+
+	fx, fy, fz := [2]string{"X", "f32"},
+		[2]string{"Y", "f32"},
+		[2]string{"Z", "f32"}
+
+	position := sigmaMustAssert[*yks.StructObject](scriptMeshObject.Get("Position"))
+	position.CheckFormat(
+		fx,
+		fy,
+		fz,
+	)
+
+	posX, posY, posZ := sigmaMustAssert[float32](position.Get("X")),
+		sigmaMustAssert[float32](position.Get("Y")),
+		sigmaMustAssert[float32](position.Get("Z"))
+
+	scale := sigmaMustAssert[*yks.StructObject](scriptMeshObject.Get("Scale"))
+	scale.CheckFormat(
+		fx,
+		fy,
+		fz,
+	)
+
+	scaleX, scaleY, scaleZ := sigmaMustAssert[float32](scale.Get("X")),
+		sigmaMustAssert[float32](scale.Get("Y")),
+		sigmaMustAssert[float32](scale.Get("Z"))
+
+	rotation := sigmaMustAssert[*yks.StructObject](scriptMeshObject.Get("Rotation"))
+	rotation.CheckFormat(
+		[2]string{"V", "Vec3"},
+		[2]string{"W", "f32"},
+	)
+
+	rotW := sigmaMustAssert[float32](rotation.Get("W"))
+	rotVec3 := sigmaMustAssert[*yks.StructObject](rotation.Get("V"))
+	rotVec3.CheckFormat(
+		fx,
+		fy,
+		fz,
+	)
+
+	rotX, rotY, rotZ := sigmaMustAssert[float32](rotVec3.Get("X")),
+		sigmaMustAssert[float32](rotVec3.Get("Y")),
+		sigmaMustAssert[float32](rotVec3.Get("Z"))
+
+	mesh.Position = mgl32.Vec3{posX, posY, posZ}
+	mesh.Scale = mgl32.Vec3{scaleX, scaleY, scaleZ}
+	mesh.Rotation = mgl32.Quat{
+		V: mgl32.Vec3{rotX, rotY, rotZ},
+		W: rotW,
+	}
 }
 
 var staticIdentities [100]mgl32.Mat4
@@ -222,6 +286,10 @@ func (cubeMapObj *CubeMapObject) Draw(shaderProgram ShaderProgram, camera *Camer
 	cubeMap.Bind(shaderProgram.GetUniformLocation(SkyboxUniform))
 
 	mesh.DrawArrays(gl.TRIANGLES, 0, int32(len(mesh.Vertices)))
+}
+
+func (cubeMapObj *CubeMapObject) SyncWithScript() {
+
 }
 
 func (cubeMapObj *CubeMapObject) GetModelMatrix() mgl32.Mat4 {

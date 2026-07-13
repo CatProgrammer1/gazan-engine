@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
+	"gl/yks"
 
 	"log"
 	"os"
@@ -117,8 +117,6 @@ func newMeshFromFile(path string, usage uint32, parallel bool, atts ...Attribute
 			var weights []mgl32.Vec4
 			var joints [][4]uint8
 			var tangents []mgl32.Vec4
-
-			fmt.Println(primitive.Attributes)
 
 			var materialIndex int
 			if primitive.Material != nil {
@@ -362,6 +360,8 @@ type Mesh struct {
 	boneIndexMap  map[string]int
 	bonesInfo     []*BoneInfo
 	VAO, VBO, EBO uint32
+
+	ScriptMesh *yks.StructObject
 }
 
 func (mesh Mesh) DrawElements(shaderProgram ShaderProgram, mode uint32, xtype uint32) {
@@ -393,7 +393,7 @@ func (mesh Mesh) DrawElements(shaderProgram ShaderProgram, mode uint32, xtype ui
 			}
 			gl.DrawElements(mode, int32(submesh.IndexCount), xtype, unsafe.Pointer(uintptr(submesh.IndexOffset*int(xtypeSize))))
 		}
-	}else {
+	} else {
 		gl.DrawElements(mode, int32(len(mesh.Indices)), xtype, nil)
 	}
 	gl.BindVertexArray(0)

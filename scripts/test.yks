@@ -1,5 +1,58 @@
+import "gl"
 
+yar maxShadowResolution i32 = (1024 * 6)?i32
 
-func Update() {
-    print(game)
+yar vertexShader Shader = LoadShader("shaders/main.vs", GL_VERTEX_SHADER)
+yar fragShader Shader = LoadShader("shaders/main.fs", GL_FRAGMENT_SHADER)
+
+yar shaderProgram ShaderProgram = MakeShaderProgram([vertexShader, fragShader,] <- Shader)
+
+yar vertexShaderDepth Shader = LoadShader("shaders/depth.vs", GL_VERTEX_SHADER)
+yar fragShaderDepth Shader = LoadShader("shaders/depth.fs", GL_FRAGMENT_SHADER)
+
+yar depthProgram ShaderProgram = MakeShaderProgram([vertexShaderDepth, fragShaderDepth,] <- Shader)
+
+yar vertexShaderDepthP Shader = LoadShader("shaders/depth_p.vs", GL_VERTEX_SHADER)
+yar geomShaderDepthP Shader = LoadShader("shaders/depth_p.gs", GL_GEOMETRY_SHADER)
+yar fragShaderDepthP Shader = LoadShader("shaders/depth_p.fs", GL_FRAGMENT_SHADER)
+
+yar depthProgramPoint ShaderProgram = MakeShaderProgram([vertexShaderDepthP, geomShaderDepthP, fragShaderDepthP,] <- Shader)
+
+yar shadowMapDir ShadowMap = NewShadowMap(depthProgram, "dirShadowMap", maxShadowResolution, 1?i32, 0?u32)
+yar shadowMapSpot ShadowMap = NewShadowMap(depthProgram, "spotShadowMap", maxShadowResolution/3?i32, 1?i32, 1?u32)
+yar shadowMapPoint ShadowMap = NewShadowMap(depthProgramPoint, "dirShadowMap", maxShadowResolution/3?i32, 1?i32, 2?u32)
+
+game->AddShadowMap(shadowMapDir) /*type: 0*/
+game->AddShadowMap(shadowMapPoint) /*type: 1*/
+game->AddShadowMap(shadowMapSpot) /*type: 2*/
+
+yar b Light = NewSpotLight(new Vec3{
+    X: 0,
+    Y: 3,
+    Z: 0,
+}, new Vec3{
+    X: 0,
+    Y: -1,
+    Z: 0,
+}, new Vec3{
+    X: 2,
+    Y: 2,
+    Z: 2,
+}, 30, 0.45, 0.5)
+
+yar workspace Workspace = NewWorkspace("main", true, shaderProgram)
+
+yar mesh Mesh = LoadMesh("shit/plate.glb")
+
+game->AddMesh(mesh)
+
+yar meshObject MeshObject = NewMeshObject("sigma", mesh)
+meshObject->Scale = new Vec3{
+    X: 10, Y: 0.1, Z: 10,
 }
+
+workspace->AddObject(meshObject)
+
+game->AddWorkspace(workspace)
+
+game->AddLightSrc(b)
