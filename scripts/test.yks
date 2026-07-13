@@ -35,10 +35,10 @@ yar b Light = NewSpotLight(new Vec3{
     Y: -1,
     Z: 0,
 }, new Vec3{
-    X: 2,
+    X: 0,
     Y: 2,
-    Z: 2,
-}, 30, 0.45, 0.5)
+    Z: 0,
+}, 30, 0.2, 0.25)
 
 yar workspace Workspace = NewWorkspace("main", true, shaderProgram)
 
@@ -48,10 +48,20 @@ game->AddMesh(mesh)
 
 yar meshObject MeshObject = NewMeshObject("sigma", mesh)
 meshObject->Scale = new Vec3{
-    X: 10, Y: 0.1, Z: 10,
+    X: 1, Y: 0.1, Z: 1,
 }
 
 workspace->AddObject(meshObject)
+
+yar meshObject2 MeshObject = NewMeshObject("sigma2", mesh)
+meshObject2->Scale = new Vec3{
+    X: 0.1, Y: 0.1, Z: 0.1,
+}
+meshObject2->Position = new Vec3{
+    X: 0, Y: 0.3, Z: 0,
+}
+
+workspace->AddObject(meshObject2)
 
 game->AddWorkspace(workspace)
 
