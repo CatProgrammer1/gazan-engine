@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gl/yks"
 	"log"
+	"math"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -16,26 +17,39 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-func makeStructObjectFromStructure(structure *yks.Structure, fields []*yks.Field) *yks.StructObject {
+func makeStructObjectFromStructure(structure *yks.Structure, fields map[string]*yks.Field) *yks.StructObject {
 	structObject := &yks.StructObject{
 		Identifier: structure.Identifier,
 
 		Fields:  fields,
-		Methods: []*yks.Method{},
+		Methods: make(map[string]*yks.Method, structure.CountMethods()),
 
 		LastMem: []byte{},
 	}
 
-	method_i := 0
 	for _, field := range structure.Fields {
 		if field.Method {
-			structObject.Methods = append(structObject.Methods, &yks.Method{
+
+			fieldDeclFunc := field.Func
+
+			methodFuncClone := new(yks.FuncDec)
+			methodFuncClone.Self = structObject
+			methodFuncClone.Arguments = fieldDeclFunc.Arguments
+			methodFuncClone.ArgumentsDataTypes = fieldDeclFunc.ArgumentsDataTypes
+			methodFuncClone.Body = fieldDeclFunc.Body
+			methodFuncClone.Identifier = fieldDeclFunc.Identifier
+			methodFuncClone.ReturnDataTypes = fieldDeclFunc.ReturnDataTypes
+			methodFuncClone.Template = fieldDeclFunc.Template
+			methodFuncClone.X = fieldDeclFunc.X
+			methodFuncClone.Y = fieldDeclFunc.Y
+
+			structObject.Methods[field.Identifier] = &yks.Method{
 				Identifier: field.Identifier,
 				Func: &yks.Cell{
-					FuncValue: field.Func,
+					DataType:  "func",
+					FuncValue: methodFuncClone,
 				},
-			})
-			method_i++
+			}
 		}
 	}
 
@@ -396,6 +410,210 @@ var (
 					return []any{}
 				}),
 			},
+
+			{
+				Identifier: "ListenInput",
+				DataType:   "func",
+				Method:     true,
+
+				//* ListenInput
+				Func: yks.NewFTemp("ListenInput", func(v ...any) []any {
+					yks.ArgsCheck(v, 2, 2, "i64", "bool")
+
+					//x, y := v[0].(int), v[1].(int)
+					//inter := v[2].(*yks.Interpreter)
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					key := v[0].(int64)
+					isMouse := v[1].(bool)
+
+					if !isMouse {
+						mainGame.ListenKeys = append(mainGame.ListenKeys, key)
+					} else {
+						mainGame.ListenButtons = append(mainGame.ListenButtons, key)
+					}
+
+					return []any{}
+				}),
+			},
+
+			{
+				Identifier: "GetCamera",
+				DataType:   "func",
+				Method:     true,
+
+				//* GetCamera
+				Func: yks.NewFTemp("GetCamera", func(v ...any) []any {
+					x, y := v[0].(int), v[1].(int)
+					inter := v[2].(*yks.Interpreter)
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					camera := mainGame.Camera
+					if camera.ScriptCamera != nil {
+						return []any{camera.ScriptCamera}
+					}
+
+					structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Camera"))
+					if !ok {
+						return []any{nil}
+					}
+
+					vec3Structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Vec3"))
+					if !ok {
+						return []any{nil}
+					}
+
+					var cameraObj *yks.StructObject
+					{
+
+						positionObj := makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+							"X": {
+								Identifier: "X",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Y": {
+								Identifier: "Y",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Z": {
+								Identifier: "Z",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+						})
+
+						frontObj := makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+							"X": {
+								Identifier: "X",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Y": {
+								Identifier: "Y",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Z": {
+								Identifier: "Z",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(-1), x, y),
+							},
+						})
+
+						upObj := makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+							"X": {
+								Identifier: "X",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Y": {
+								Identifier: "Y",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
+							},
+							"Z": {
+								Identifier: "Z",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+						})
+
+						cameraUpObj := makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+							"X": {
+								Identifier: "X",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Y": {
+								Identifier: "Y",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
+							},
+							"Z": {
+								Identifier: "Z",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+						})
+
+						cameraRightObj := makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+							"X": {
+								Identifier: "X",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Y": {
+								Identifier: "Y",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+							"Z": {
+								Identifier: "Z",
+								DataType:   "f32",
+
+								Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
+							},
+						})
+
+						cameraObj = makeStructObjectFromStructure(structure, map[string]*yks.Field{
+							"Position": {
+								Identifier: "Position",
+								DataType:   "Vec3",
+
+								Value: yks.CLPTR(inter.CurrentScope, "Vec3", positionObj, x, y),
+							},
+							"Front": {
+								Identifier: "Front",
+								DataType:   "Vec3",
+
+								Value: yks.CLPTR(inter.CurrentScope, "Vec3", frontObj, x, y),
+							},
+
+							"Up": {
+								Identifier: "Up",
+								DataType:   "Vec3",
+
+								Value: yks.CLPTR(inter.CurrentScope, "Vec3", upObj, x, y),
+							},
+
+							"CameraRight": {
+								Identifier: "CameraRight",
+								DataType:   "Vec3",
+
+								Value: yks.CLPTR(inter.CurrentScope, "Vec3", cameraRightObj, x, y),
+							},
+							"CameraUp": {
+								Identifier: "CameraUp",
+								DataType:   "Vec3",
+
+								Value: yks.CLPTR(inter.CurrentScope, "Vec3", cameraUpObj, x, y),
+							},
+						})
+					}
+
+					camera.ScriptCamera = cameraObj
+
+					return []any{cameraObj}
+				}),
+			},
 		},
 	}
 
@@ -422,10 +640,11 @@ var (
 				return []any{nil}
 			}
 
-			meshObj := makeStructObjectFromStructure(structure, []*yks.Field{
-				{
+			meshObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"Name": {
 					Identifier: "Name",
-					DataType:   "string",
+
+					DataType: "string",
 
 					Value: yks.CLPTR(inter.CurrentScope, "string", name, x, y),
 				},
@@ -459,20 +678,20 @@ var (
 				return []any{nil}
 			}
 
-			shaderObj := makeStructObjectFromStructure(structure, []*yks.Field{
-				{
+			shaderObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"Source": {
 					Identifier: "Source",
 					DataType:   "string",
 
 					Value: yks.CLPTR(inter.CurrentScope, "string", shader.Source, x, y),
 				},
-				{
+				"Type": {
 					Identifier: "Type",
 					DataType:   "u32",
 
 					Value: yks.CLPTR(inter.CurrentScope, "u32", shader.Type, x, y),
 				},
-				{
+				"shader": {
 					Identifier: "shader",
 					DataType:   "u32",
 
@@ -531,8 +750,8 @@ var (
 			program.AttachShaders(true, shaders...)
 			program.Link()
 
-			programObj := makeStructObjectFromStructure(structure, []*yks.Field{
-				{
+			programObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"program": {
 					Identifier: "program",
 					DataType:   "u32",
 
@@ -577,50 +796,138 @@ var (
 
 			shadowMap := newShadowMap(shaderProgram, uniformName, resolution, layers, textureUnit, mgl32.Vec4{1, 1, 1, 1})
 
-			shadowMapObj := makeStructObjectFromStructure(structure, []*yks.Field{
-				{
+			shadowMapObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"UniformName": {
 					Identifier: "UniformName",
 					DataType:   "string",
 
 					Value: yks.CLPTR(inter.CurrentScope, "string", shadowMap.UniformName, x, y),
 				},
-				{
+				"ShaderProgram": {
 					Identifier: "ShaderProgram",
 					DataType:   "ShaderProgram",
 
 					Value: yks.CLPTR(inter.CurrentScope, "ShaderProgram", shaderProgramObj, x, y),
 				},
-				{
+				"Layers": {
 					Identifier: "Layers",
 					DataType:   "i32",
 
 					Value: yks.CLPTR(inter.CurrentScope, "i32", shadowMap.Layers, x, y),
 				},
-				{
+				"Resolution": {
 					Identifier: "Resolution",
 					DataType:   "i32",
 
 					Value: yks.CLPTR(inter.CurrentScope, "i32", shadowMap.Resolution, x, y),
 				},
-				{
+				"TextureUnit": {
 					Identifier: "TextureUnit",
 					DataType:   "u32",
 
 					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.TextureUnit, x, y),
 				},
-				{
+				"DepthMap": {
 					Identifier: "DepthMap",
 					DataType:   "u32",
 
 					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.DepthMap, x, y),
 				},
-				{
+				"FBO": {
 					Identifier: "FBO",
 					DataType:   "u32",
 
 					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.FBO, x, y),
 				},
-				{
+				"Target": {
+					Identifier: "Target",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.Target, x, y),
+				},
+			})
+
+			return []any{shadowMapObj}
+		}},
+
+		{Key: "NewShadowCubeMap", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 5, 5, "ShaderProgram", "string", "i32", "i32", "u32")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			shaderProgramObj := v[0].(*yks.StructObject)
+
+			ok, reason := shaderProgramObj.CheckFormat([2]string{"program", "u32"})
+			if !ok {
+				yks.Throw(inter.CurrentFileName, reason, x, y)
+			}
+
+			shaderProgram := ShaderProgram{
+				program: sigmaMustAssert[uint32](shaderProgramObj.Get("program")),
+			}
+
+			uniformName := v[1].(string)
+			resolution := v[2].(int32)
+			layers := v[3].(int32)
+
+			texUnit := v[4].(uint32)
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("ShadowMap"))
+			if !ok {
+				return []any{nil}
+			}
+
+			textureUnit := gl.TEXTURE10 + texUnit
+
+			shadowMap := newShadowMapCubeMap(shaderProgram, uniformName, resolution, layers, textureUnit)
+
+			shadowMapObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"UniformName": {
+					Identifier: "UniformName",
+					DataType:   "string",
+
+					Value: yks.CLPTR(inter.CurrentScope, "string", shadowMap.UniformName, x, y),
+				},
+				"ShaderProgram": {
+					Identifier: "ShaderProgram",
+					DataType:   "ShaderProgram",
+
+					Value: yks.CLPTR(inter.CurrentScope, "ShaderProgram", shaderProgramObj, x, y),
+				},
+				"Layers": {
+					Identifier: "Layers",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", shadowMap.Layers, x, y),
+				},
+				"Resolution": {
+					Identifier: "Resolution",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", shadowMap.Resolution, x, y),
+				},
+				"TextureUnit": {
+					Identifier: "TextureUnit",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.TextureUnit, x, y),
+				},
+				"DepthMap": {
+					Identifier: "DepthMap",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.DepthMap, x, y),
+				},
+				"FBO": {
+					Identifier: "FBO",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", shadowMap.FBO, x, y),
+				},
+				"Target": {
 					Identifier: "Target",
 					DataType:   "u32",
 
@@ -681,20 +988,20 @@ var (
 
 			var positionObj, scaleObj, rotationVec3Obj, rotationObj *yks.StructObject
 			{
-				positionObj = makeStructObjectFromStructure(vec3Structure, []*yks.Field{
-					{
+				positionObj = makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+					"X": {
 						Identifier: "X",
 						DataType:   "f32",
 
 						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
 					},
-					{
+					"Y": {
 						Identifier: "Y",
 						DataType:   "f32",
 
 						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
 					},
-					{
+					"Z": {
 						Identifier: "Z",
 						DataType:   "f32",
 
@@ -702,20 +1009,20 @@ var (
 					},
 				})
 
-				scaleObj = makeStructObjectFromStructure(vec3Structure, []*yks.Field{
-					{
+				scaleObj = makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+					"X": {
 						Identifier: "X",
 						DataType:   "f32",
 
 						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
 					},
-					{
+					"Y": {
 						Identifier: "Y",
 						DataType:   "f32",
 
 						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(1), x, y),
 					},
-					{
+					"Z": {
 						Identifier: "Z",
 						DataType:   "f32",
 
@@ -723,20 +1030,20 @@ var (
 					},
 				})
 
-				rotationVec3Obj = makeStructObjectFromStructure(vec3Structure, []*yks.Field{
-					{
+				rotationVec3Obj = makeStructObjectFromStructure(vec3Structure, map[string]*yks.Field{
+					"X": {
 						Identifier: "X",
 						DataType:   "f32",
 
 						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
 					},
-					{
+					"Y": {
 						Identifier: "Y",
 						DataType:   "f32",
 
 						Value: yks.CLPTR(inter.CurrentScope, "f32", float32(0), x, y),
 					},
-					{
+					"Z": {
 						Identifier: "Z",
 						DataType:   "f32",
 
@@ -744,14 +1051,14 @@ var (
 					},
 				})
 
-				rotationObj = makeStructObjectFromStructure(quatStructure, []*yks.Field{
-					{
+				rotationObj = makeStructObjectFromStructure(quatStructure, map[string]*yks.Field{
+					"V": {
 						Identifier: "V",
 						DataType:   "Vec3",
 
 						Value: yks.CLPTR(inter.CurrentScope, "Vec3", rotationVec3Obj, x, y),
 					},
-					{
+					"W": {
 						Identifier: "W",
 						DataType:   "f32",
 
@@ -760,73 +1067,81 @@ var (
 				})
 			}
 
-			meshObjectObj := makeStructObjectFromStructure(structure, []*yks.Field{
-				{
+			meshObjectObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"Name": {
 					Identifier: "Name",
 					DataType:   "string",
 
 					Value: yks.CLPTR(inter.CurrentScope, "string", name, x, y),
 				},
-				{
+				"Mesh": {
 					Identifier: "Mesh",
 					DataType:   "Mesh",
 
 					Value: yks.CLPTR(inter.CurrentScope, "Mesh", meshObj, x, y),
 				},
-				{
+				"Position": {
 					Identifier: "Position",
 					DataType:   "Vec3",
 
 					Value: yks.CLPTR(inter.CurrentScope, "Vec3", positionObj, x, y),
 				},
-				{
+				"Scale": {
 					Identifier: "Scale",
 					DataType:   "Vec3",
 
 					Value: yks.CLPTR(inter.CurrentScope, "Vec3", scaleObj, x, y),
 				},
-				{
+				"Rotation": {
 					Identifier: "Rotation",
 					DataType:   "Quat",
 
 					Value: yks.CLPTR(inter.CurrentScope, "Quat", rotationObj, x, y),
 				},
+				"Animations": {
+					Identifier: "Animations",
+					DataType:   "table",
+
+					Value: yks.CLPTR(inter.CurrentScope, "table", animationObjMap, x, y),
+				},
 			})
 
 			for i, animation := range meshObject.Animations {
-				animationObj := makeStructObjectFromStructure(animationStructure, []*yks.Field{
-					{
+				animationObj := makeStructObjectFromStructure(animationStructure, map[string]*yks.Field{
+					"Mesh": {
 						Identifier: "Mesh",
 						DataType:   "Mesh",
 
 						Value: yks.CLPTR(inter.CurrentScope, "Mesh", meshObj, x, y),
 					},
-					{
+					"MeshObject": {
 						Identifier: "MeshObject",
 						DataType:   "MeshObject",
 
 						Value: yks.CLPTR(inter.CurrentScope, "MeshObject", meshObjectObj, x, y),
 					},
 
-					{
+					"TimeMarker": {
 						Identifier: "TimeMarker",
 						DataType:   "f32",
 
 						Value: yks.CLPTR(inter.CurrentScope, "f32", animation.TimeMarker, x, y),
 					},
-					{
+					"IsPlaying": {
 						Identifier: "IsPlaying",
 						DataType:   "bool",
 
 						Value: yks.CLPTR(inter.CurrentScope, "bool", animation.IsPlaying, x, y),
 					},
-					{
+					"Looped": {
 						Identifier: "Looped",
 						DataType:   "bool",
 
 						Value: yks.CLPTR(inter.CurrentScope, "bool", animation.Looped, x, y),
 					},
 				})
+
+				animation.ScriptAnimation = animationObj
 
 				animationObjMap.Set(int64(i), yks.CLPTR(inter.CurrentScope, "Animation", animationObj, x, y))
 			}
@@ -843,7 +1158,7 @@ var (
 		}},
 
 		{Key: "print", Val: func(v ...any) []any {
-			fmt.Println(yks.Format(v[yks.BUILTIN_SPECIALS:]...))
+			fmt.Println(yks.Format(false, v[yks.BUILTIN_SPECIALS:]...))
 			return nil
 		}},
 
@@ -852,7 +1167,7 @@ var (
 
 			v = v[yks.BUILTIN_SPECIALS:]
 
-			table := v[0].(*orderedmap.OrderedMap[any, any])
+			table := v[0].(*orderedmap.OrderedMap[any, *yks.Cell])
 			key := v[1]
 
 			table.Delete(key)
@@ -882,7 +1197,7 @@ var (
 			return nil
 		}},
 
-		{Key: "Throw", Val: func(v ...any) []any {
+		{Key: "throw", Val: func(v ...any) []any {
 			x, y := v[0].(int), v[1].(int)
 			inter := v[2].(*yks.Interpreter)
 
@@ -891,7 +1206,7 @@ var (
 				Throw(inter.CurrentFileName, "Function requires one or more arguments.", x, y)
 			}
 
-			Throw(inter.CurrentFileName, yks.Format(v...), x, y)
+			Throw(inter.CurrentFileName, yks.Format(false, v...), x, y)
 			return nil
 		}},
 
@@ -941,7 +1256,7 @@ var (
 			return []any{time.Now().UnixMilli()}
 		}},
 		{Key: "strformat", Val: func(v ...any) []any {
-			return []any{yks.Format(v[yks.BUILTIN_SPECIALS:]...)}
+			return []any{yks.Format(false, v[yks.BUILTIN_SPECIALS:]...)}
 		}},
 		{Key: "gettype", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 1, 1, "any")
@@ -1098,8 +1413,68 @@ var (
 			}
 		}},
 
+		{Key: "cos32", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f32")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float32)
+
+			return []any{float32(math.Cos(float64(f)))}
+		}},
+
+		{Key: "cos", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f64")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float64)
+
+			return []any{math.Cos(f)}
+		}},
+
+		{Key: "sin32", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f32")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float32)
+
+			return []any{float32(math.Sin(float64(f)))}
+		}},
+
+		{Key: "sin", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f64")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float64)
+
+			return []any{math.Sin(f)}
+		}},
+
+		{Key: "tan32", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f32")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float32)
+
+			return []any{float32(math.Tan(float64(f)))}
+		}},
+
+		{Key: "tan", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f64")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float64)
+
+			return []any{math.Tan(f)}
+		}},
+
 		{Key: "Game", Val: gameYKSStructure},
 
-		{Key: "game", Val: makeStructObjectFromStructure(gameYKSStructure, []*yks.Field{})},
+		{Key: "game", Val: makeStructObjectFromStructure(gameYKSStructure, map[string]*yks.Field{})},
 	}
 )

@@ -146,6 +146,8 @@ func (mesh *MeshObject) Draw(shaderProgram ShaderProgram, camera *Camera) {
 	model := mesh.GetModelMatrix()
 
 	for _, anim := range mesh.Animations {
+		anim.SyncWithScript()
+
 		if anim.IsPlaying {
 			anim.Update(CurrentTime)
 		}
@@ -178,6 +180,8 @@ func (mesh *MeshObject) DrawShadow(shaderProgramDepth ShaderProgram) {
 	model := mesh.GetModelMatrix()
 
 	for _, anim := range mesh.Animations {
+		anim.SyncWithScript()
+
 		if anim.IsPlaying {
 			anim.Update(CurrentTime)
 		}

@@ -184,6 +184,9 @@ func newGame(window *glfw.Window) *Game {
 		ShaderPrograms: []ShaderProgram{},
 		Workspaces:     []*Workspace{},
 
+		ListenKeys:    []int64{},
+		ListenButtons: []int64{},
+
 		Meshes:  []*Mesh{},
 		Objects: make(map[string]Object),
 
@@ -205,6 +208,9 @@ type Game struct {
 	window *glfw.Window
 
 	Camera *Camera
+
+	ListenKeys    []int64
+	ListenButtons []int64
 
 	ShadowMaps     []ShadowMap
 	ShaderPrograms []ShaderProgram
@@ -228,10 +234,6 @@ type Game struct {
 
 	sm_indeces map[int32]int32
 }
-
-var (
-	moveSpeed float32
-)
 
 func (game *Game) AddLightSrc(light *Light) {
 	switch light.Type {
@@ -287,49 +289,85 @@ func (game *Game) GetMesh(name string) *Mesh {
 	return nil
 }
 
-var funcCallTemp *yks.FuncCall = &yks.FuncCall{}
+var funcCallTemp *yks.FuncCall = &yks.FuncCall{
+	Arguments: make([]yks.Node, 1),
+}
+
+var (
+	argumentsTemplates = make([][]yks.Node, 10)
+)
 
 func (game *Game) Update() {
+	window := game.window
+
 	for _, script := range game.Scripts {
 		update, ok := script.CurrentScope.Data["Update"]
 		if ok && update.FuncValue != nil {
-			funcCallTemp.Func = update.FuncValue
+			updateFuncDec := update.FuncValue
+
+			funcCallTemp.Arguments = argumentsTemplates[1]
+
+			funcCallTemp.Arguments[0] = &yks.FloatNode{
+				Value: float64(DeltaTime),
+				X:     0, Y: 0,
+			}
+			funcCallTemp.Func = updateFuncDec
 
 			script.CompleteNode(funcCallTemp)
 		}
-	}
 
-	window := game.window
+		onInputEvent, ok := script.CurrentScope.Data["OnInputEvent"]
+		if ok && onInputEvent.FuncValue != nil {
+			onInputEventFuncDec := onInputEvent.FuncValue
+
+			funcCallTemp.Arguments = argumentsTemplates[3]
+			funcCallTemp.Func = onInputEventFuncDec
+
+			for _, key := range game.ListenKeys {
+				action := window.GetKey(glfw.Key(key))
+
+				funcCallTemp.Arguments[0] = &yks.IntNode{
+					ValueI64: yks.Rawint64(key),
+					X:        0, Y: 0,
+				}
+				funcCallTemp.Arguments[1] = &yks.IntNode{
+					ValueI64: yks.Rawint64(action),
+					X:        0, Y: 0,
+				}
+				funcCallTemp.Arguments[2] = &yks.BoolNode{
+					Value: false,
+					X:     0, Y: 0,
+				}
+
+				script.CompleteNode(funcCallTemp)
+			}
+
+			for _, button := range game.ListenButtons {
+				action := window.GetMouseButton(glfw.MouseButton(button))
+
+				funcCallTemp.Arguments[0] = &yks.IntNode{
+					ValueI64: yks.Rawint64(button),
+					X:        0, Y: 0,
+				}
+				funcCallTemp.Arguments[1] = &yks.IntNode{
+					ValueI64: yks.Rawint64(action),
+					X:        0, Y: 0,
+				}
+				funcCallTemp.Arguments[2] = &yks.BoolNode{
+					Value: true,
+					X:     0, Y: 0,
+				}
+
+				script.CompleteNode(funcCallTemp)
+			}
+		}
+	}
 
 	camera := game.Camera
 
-	if window.GetKey(glfw.KeyLeftShift) == glfw.Press {
-		moveSpeed = 10
-	} else if window.GetKey(glfw.KeyC) == glfw.Press {
-		moveSpeed = .1
-	} else {
-		moveSpeed = 1
-	}
-	if window.GetKey(glfw.KeyW) == glfw.Press {
-		camera.Position = camera.Position.Add(camera.Front.Mul(moveSpeed).Mul(DeltaTime))
-	}
-	if window.GetKey(glfw.KeyS) == glfw.Press {
-		camera.Position = camera.Position.Sub(camera.Front.Mul(moveSpeed).Mul(DeltaTime))
-	}
-	if window.GetKey(glfw.KeyA) == glfw.Press {
-		camera.Position = camera.Position.Sub(camera.Front.Cross(camera.CameraUp).Normalize().Mul(moveSpeed).Mul(DeltaTime))
-	}
-	if window.GetKey(glfw.KeyD) == glfw.Press {
-		camera.Position = camera.Position.Add(camera.Front.Cross(camera.CameraUp).Normalize().Mul(moveSpeed).Mul(DeltaTime))
-	}
-	if window.GetKey(glfw.KeySpace) == glfw.Press {
-		camera.Position = camera.Position.Add(camera.Front.Cross(camera.CameraRight).Normalize().Mul(moveSpeed).Mul(DeltaTime))
-	}
-	if window.GetKey(glfw.KeyLeftControl) == glfw.Press {
-		camera.Position = camera.Position.Sub(camera.Front.Cross(camera.CameraRight).Normalize().Mul(moveSpeed).Mul(DeltaTime))
-	}
-
 	camera.Update()
+
+	camera.SyncWithScript()
 
 	clear(game.sm_indeces)
 

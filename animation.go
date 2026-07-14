@@ -45,7 +45,44 @@ type Animation struct {
 	Looped     bool
 	LastTime   float32
 
+	IsDirty bool
+
 	ScriptAnimation *yks.StructObject
+}
+
+func (animation *Animation) SyncWithScript() {
+	scriptAnimation := animation.ScriptAnimation
+	if scriptAnimation == nil {
+		return
+	}
+
+	if scriptAnimation.IsDirty {
+		scriptAnimation.IsDirty = false
+
+		meshObj := sigmaMustAssert[*yks.StructObject](scriptAnimation.Get("Mesh"))
+
+		meshName := sigmaMustAssert[string](meshObj.Get("Name"))
+
+		timeMarker := sigmaMustAssert[float32](scriptAnimation.Get("TimeMarker"))
+
+		isPlaying := sigmaMustAssert[bool](scriptAnimation.Get("IsPlaying"))
+
+		looped := sigmaMustAssert[bool](scriptAnimation.Get("Looped"))
+
+		animation.Mesh = mainGame.GetMesh(meshName)
+
+		animation.TimeMarker = timeMarker
+		animation.IsPlaying = isPlaying
+		animation.Looped = looped
+	} else if animation.IsDirty {
+		animation.IsDirty = false
+
+		scriptAnimation.RawSet("TimeMarker", animation.TimeMarker, -14, -14)
+
+		scriptAnimation.RawSet("IsPlaying", animation.IsPlaying, -14, -14)
+
+		scriptAnimation.RawSet("Looped", animation.Looped, -14, -14)
+	}
 }
 
 func (animation *Animation) Play(currentTime float32) {
@@ -56,12 +93,16 @@ func (animation *Animation) Play(currentTime float32) {
 	animation.IsPlaying = true
 	animation.TimeMarker = 0
 	animation.LastTime = currentTime
+
+	animation.IsDirty = true
 }
 
 func (animation *Animation) Update(currentTime float32) {
 	if animation.MeshObject == nil {
 		Throw("Animation must be have a meshObject")
 	}
+
+	//animation.SyncWithScript()
 
 	document := animation.Document
 
@@ -137,6 +178,7 @@ func (animation *Animation) Update(currentTime float32) {
 
 			animation.Transforms = animation.getNodeTransforms(rootNode)
 		}
+		animation.IsDirty = true
 	}
 }
 

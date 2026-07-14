@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gl/yks"
 	"image"
 
 	"github.com/go-gl/gl/v4.3-core/gl"
@@ -36,6 +37,10 @@ var (
 func initDefault() {
 	for i := range staticIdentities {
 		staticIdentities[i] = mgl32.Ident4()
+	}
+
+	for i := 0; i < len(argumentsTemplates); i++ {
+		argumentsTemplates[i] = make([]yks.Node, i)
 	}
 
 	defaultDiffuseTexture = newTexture(image.Rect(0, 0, 1, 1), []uint8{160, 160, 160, 255}, gl.TEXTURE0)
