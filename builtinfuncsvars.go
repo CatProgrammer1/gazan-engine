@@ -575,8 +575,6 @@ var (
 
 			textureUnit := gl.TEXTURE10 + texUnit
 
-			fmt.Println(textureUnit)
-
 			shadowMap := newShadowMap(shaderProgram, uniformName, resolution, layers, textureUnit, mgl32.Vec4{1, 1, 1, 1})
 
 			shadowMapObj := makeStructObjectFromStructure(structure, []*yks.Field{

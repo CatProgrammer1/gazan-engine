@@ -40,11 +40,23 @@ yar b Light = NewSpotLight(new Vec3{
     Z: 0,
 }, 30, 0.2, 0.25)
 
+/*d,,dw.f.fd.,3o24&*%*&$#%*$#@^
+
+sdakj4t5(*U$#@U*U$
+
+..)*/
+
 yar workspace Workspace = NewWorkspace("main", true, shaderProgram)
 
 yar mesh Mesh = LoadMesh("shit/plate.glb")
 
 game->AddMesh(mesh)
+
+/*d,,dw.f.fd.,3o24&*%*&$#%*$#@^
+
+sdakj4t5(*U$#@U*U$111
+
+..)*/
 
 yar meshObject MeshObject = NewMeshObject("sigma", mesh)
 meshObject->Scale = new Vec3{
@@ -60,6 +72,12 @@ meshObject2->Scale = new Vec3{
 meshObject2->Position = new Vec3{
     X: 0, Y: 0.3, Z: 0,
 }
+
+/*d,,dw.f.fd.,3o24&*%*&$#%*$#@^
+
+sdakj4t5(*U$#@U*U$
+
+..)*/
 
 workspace->AddObject(meshObject2)
 

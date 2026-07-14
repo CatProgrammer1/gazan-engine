@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"gl/yks"
 	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -43,6 +44,8 @@ type Animation struct {
 	IsPlaying  bool
 	Looped     bool
 	LastTime   float32
+
+	ScriptAnimation *yks.StructObject
 }
 
 func (animation *Animation) Play(currentTime float32) {
