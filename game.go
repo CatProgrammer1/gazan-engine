@@ -184,8 +184,8 @@ func newGame(window *glfw.Window) *Game {
 		ShaderPrograms: []ShaderProgram{},
 		Workspaces:     []*Workspace{},
 
-		ListenKeys:    []int64{},
-		ListenButtons: []int64{},
+		ListenKeys:    []int32{},
+		ListenButtons: []int32{},
 
 		Meshes:  []*Mesh{},
 		Objects: make(map[string]Object),
@@ -199,6 +199,29 @@ func newGame(window *glfw.Window) *Game {
 
 	camera := newCamera(window, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 0, -1}, mgl32.Vec3{0, 1, 0}, mgl32.Perspective(mgl32.DegToRad(45), float32(w)/float32(h), .01, 100))
 
+	window.SetCursorPosCallback(func(w *glfw.Window, xpos, ypos float64) {
+		for _, script := range game.Scripts {
+			onCursorEvent, ok := script.CurrentScope.Data["OnCursorEvent"]
+			if ok && onCursorEvent.FuncValue != nil {
+				onCursorEventFuncDec := onCursorEvent.FuncValue
+
+				funcCallTemp.Arguments = argumentsTemplates[2]
+
+				funcCallTemp.Arguments[0] = &yks.FloatNode{
+					Value: xpos,
+					X:     0, Y: 0,
+				}
+				funcCallTemp.Arguments[1] = &yks.FloatNode{
+					Value: ypos,
+					X:     0, Y: 0,
+				}
+				funcCallTemp.Func = onCursorEventFuncDec
+
+				script.CompleteNode(funcCallTemp)
+			}
+		}
+	})
+
 	game.Camera = camera
 
 	return game
@@ -209,8 +232,8 @@ type Game struct {
 
 	Camera *Camera
 
-	ListenKeys    []int64
-	ListenButtons []int64
+	ListenKeys    []int32
+	ListenButtons []int32
 
 	ShadowMaps     []ShadowMap
 	ShaderPrograms []ShaderProgram

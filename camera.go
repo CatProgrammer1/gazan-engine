@@ -2,7 +2,6 @@ package main
 
 import (
 	"gl/yks"
-	"math"
 
 	"github.com/go-gl/glfw/v3.4/glfw"
 	"github.com/go-gl/mathgl/mgl32"
@@ -19,15 +18,15 @@ func newCamera(window *glfw.Window, position, front, up mgl32.Vec3, projection m
 
 	camera.Update()
 
-	var pitch, yaw float32
+	//var pitch, yaw float32
 
-	firstMouse := true
+	//firstMouse := true
 
-	sensitivity := .1
+	//sensitivity := .1
 
-	lastX, lastY := 0.0, 0.0
+	//lastX, lastY := 0.0, 0.0
 
-	window.SetCursorPosCallback(func(w *glfw.Window, xpos, ypos float64) {
+	/*window.SetCursorPosCallback(func(w *glfw.Window, xpos, ypos float64) {
 		if firstMouse {
 			firstMouse = false
 			lastX = xpos
@@ -62,7 +61,7 @@ func newCamera(window *glfw.Window, position, front, up mgl32.Vec3, projection m
 				math.Sin(float64(mgl32.DegToRad(yaw))) * math.Cos(float64(mgl32.DegToRad(pitch))),
 			),
 		}.Normalize()
-	})
+	})*/
 
 	return camera
 }
@@ -97,7 +96,7 @@ func (camera *Camera) SyncWithScript() {
 	cameraUpObj.Set("Y", cameraUp[1], -42, -42)
 	cameraUpObj.Set("Z", cameraUp[2], -42, -42)
 
-	if !scriptCamera.IsDirty {
+	if !scriptCamera.IsDirty && !scriptCamera.HasAnyDirtyField() {
 		return
 	}
 

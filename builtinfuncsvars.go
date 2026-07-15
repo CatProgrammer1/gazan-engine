@@ -15,6 +15,7 @@ import (
 	"github.com/elliotchance/orderedmap/v3"
 	"github.com/go-gl/gl/v4.3-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 )
 
 func makeStructObjectFromStructure(structure *yks.Structure, fields map[string]*yks.Field) *yks.StructObject {
@@ -144,40 +145,6 @@ var (
 					lightSrc.SyncWithScript()
 
 					mainGame.AddLightSrc(lightSrc)
-
-					return []any{}
-				}),
-			},
-			{
-				Identifier: "AddMesh",
-				DataType:   "func",
-				Method:     true,
-
-				//* AddMesh
-				Func: yks.NewFTemp("AddMesh", func(v ...any) []any {
-					yks.ArgsCheck(v, 1, 1, "Mesh")
-
-					x, y := v[0].(int), v[1].(int)
-					inter := v[2].(*yks.Interpreter)
-
-					v = v[yks.BUILTIN_SPECIALS:]
-
-					mesh := v[0].(*yks.StructObject)
-
-					ok, reason := mesh.CheckFormat(
-						[2]string{"Name", "string"},
-					)
-					if !ok {
-						yks.Throw(inter.CurrentFileName, reason, x, y)
-					}
-
-					name := sigmaMustAssert[string](mesh.Get("Name"))
-
-					mesh.IsDirty = true
-
-					origMesh := mainGame.GetMesh(name)
-
-					mainGame.AddMesh(origMesh)
 
 					return []any{}
 				}),
@@ -418,14 +385,14 @@ var (
 
 				//* ListenInput
 				Func: yks.NewFTemp("ListenInput", func(v ...any) []any {
-					yks.ArgsCheck(v, 2, 2, "i64", "bool")
+					yks.ArgsCheck(v, 2, 2, "i32", "bool")
 
 					//x, y := v[0].(int), v[1].(int)
 					//inter := v[2].(*yks.Interpreter)
 
 					v = v[yks.BUILTIN_SPECIALS:]
 
-					key := v[0].(int64)
+					key := v[0].(int32)
 					isMouse := v[1].(bool)
 
 					if !isMouse {
@@ -1471,6 +1438,88 @@ var (
 			f := v[0].(float64)
 
 			return []any{math.Tan(f)}
+		}},
+
+		{Key: "degToRad", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f64")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float64)
+
+			return []any{mgl64.DegToRad(f)}
+		}},
+
+		{Key: "degToRad32", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f32")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float32)
+
+			return []any{mgl32.DegToRad(f)}
+		}},
+
+		{Key: "radToDeg", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f64")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float64)
+
+			return []any{mgl64.RadToDeg(f)}
+		}},
+
+		{Key: "radToDeg32", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f32")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float32)
+
+			return []any{mgl32.RadToDeg(f)}
+		}},
+
+		{Key: "sqrt32", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f32")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float32)
+
+			return []any{float32(math.Sqrt(float64(f)))}
+		}},
+
+		{Key: "sqrt", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "f64")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float64)
+
+			return []any{math.Sqrt(f)}
+		}},
+
+		{Key: "pow", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 2, 2, "f64", "f64")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float64)
+			p := v[1].(float64)
+
+			return []any{math.Pow(f, p)}
+		}},
+
+		{Key: "pow32", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 2, 2, "f32", "f32")
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			f := v[0].(float32)
+			p := v[1].(float32)
+
+			return []any{float32(math.Pow(float64(f), float64(p)))}
 		}},
 
 		{Key: "Game", Val: gameYKSStructure},

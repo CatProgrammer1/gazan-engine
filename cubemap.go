@@ -12,20 +12,28 @@ import (
 	"github.com/go-gl/gl/v4.3-core/gl"
 )
 
-func newCubeMapFromFile(path string) *CubeMap {
-	file, err := os.Open(path)
-	handle(err)
-	defer file.Close()
+func newCubeMapFromFile(pathes [6]string) *CubeMap {
+	pixes := [][]uint8{}
 
-	img, _, err := image.Decode(file)
-	handle(err)
+	var bounds image.Rectangle
 
-	b := img.Bounds()
-	nrgba := image.NewRGBA(b)
+	for _, path := range pathes {
+		file, err := os.Open(path)
+		handle(err)
+		defer file.Close()
 
-	draw.Draw(nrgba, b, img, b.Min, draw.Src)
+		img, _, err := image.Decode(file)
+		handle(err)
 
-	return newCubeMap(img.Bounds(), gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR, [][]uint8{nrgba.Pix, nrgba.Pix, nrgba.Pix, nrgba.Pix, nrgba.Pix, nrgba.Pix})
+		b := img.Bounds()
+		nrgba := image.NewRGBA(b)
+
+		bounds = b
+
+		draw.Draw(nrgba, b, img, b.Min, draw.Src)
+	}
+
+	return newCubeMap(bounds, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR, pixes)
 }
 
 func newCubeMap(bounds image.Rectangle, format int32, xtype uint32, param int32, pixs [][]uint8) *CubeMap {
