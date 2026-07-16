@@ -12,7 +12,7 @@ import (
 	"github.com/go-gl/gl/v4.3-core/gl"
 )
 
-func newCubeMapFromFile(pathes [6]string) *CubeMap {
+func newCubeMapFromFile(pathes [6]string) CubeMap {
 	pixes := [][]uint8{}
 
 	var bounds image.Rectangle
@@ -31,13 +31,15 @@ func newCubeMapFromFile(pathes [6]string) *CubeMap {
 		bounds = b
 
 		draw.Draw(nrgba, b, img, b.Min, draw.Src)
+
+		pixes = append(pixes, nrgba.Pix)
 	}
 
 	return newCubeMap(bounds, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR, pixes)
 }
 
-func newCubeMap(bounds image.Rectangle, format int32, xtype uint32, param int32, pixs [][]uint8) *CubeMap {
-	cubeMap := &CubeMap{
+func newCubeMap(bounds image.Rectangle, format int32, xtype uint32, param int32, pixs [][]uint8) CubeMap {
+	cubeMap := CubeMap{
 		Bounds: bounds,
 		unit:   9,
 	}

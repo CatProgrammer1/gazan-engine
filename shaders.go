@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"gl/yks"
+	"image"
 	"log"
 	"os"
 	"strings"
@@ -154,8 +155,29 @@ func (shaderProgram ShaderProgram) SetUniform(location int32, v any) {
 		gl.UniformMatrix4fv(location, 1, false, &v[0])
 	case *CubeMap:
 		v.Bind(location)
+	case *yks.StructObject:
+		switch v.Identifier {
+		case "CubeMap":
+			cubeMap := CubeMap{}
+
+			v.CheckFormat([2]string{"texture", "u32"}, [2]string{"unit", "u32"}, [2]string{"width", "i32"}, [2]string{"height", "i32"})
+
+			texture := sigmaMustAssert[uint32](v.Get("texture"))
+			unit := sigmaMustAssert[int32](v.Get("unit"))
+
+			width := sigmaMustAssert[int32](v.Get("width"))
+			height := sigmaMustAssert[int32](v.Get("height"))
+
+			bounds := image.Rect(0, 0, int(width), int(height))
+
+			cubeMap.texture = texture
+			cubeMap.unit = unit
+			cubeMap.Bounds = bounds
+
+			cubeMap.Bind(location)
+		}
 	default:
-		fmt.Println("Unimplemented value type in auto SetUniform method")
+		log.Fatalln("Unimplemented value type in auto SetUniform method")
 	}
 }
 

@@ -262,7 +262,7 @@ type GPUInstanceData struct {
 	GBones      [100]mgl32.Mat4
 }
 
-func newCubeMapObject(mesh *Mesh, cubeMap *CubeMap) *CubeMapObject {
+func newCubeMapObject(mesh *Mesh, cubeMap CubeMap) *CubeMapObject {
 	return &CubeMapObject{
 		Mesh:    mesh,
 		CubeMap: cubeMap,
@@ -271,7 +271,9 @@ func newCubeMapObject(mesh *Mesh, cubeMap *CubeMap) *CubeMapObject {
 
 type CubeMapObject struct {
 	Mesh    *Mesh
-	CubeMap *CubeMap
+	CubeMap CubeMap
+
+	ScriptCubeMapObject *yks.StructObject
 }
 
 func (cubeMapObj *CubeMapObject) Draw(shaderProgram ShaderProgram, camera *Camera) {

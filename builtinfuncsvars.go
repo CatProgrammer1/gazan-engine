@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"gl/yks"
+	"image"
 	"log"
 	"math"
 	"runtime"
@@ -184,6 +185,8 @@ var (
 						[2]string{"ShaderProgram", "ShaderProgram"},
 
 						[2]string{"Objects", "table"},
+
+						[2]string{"CustomUniforms", "table"},
 					)
 					if !ok {
 						yks.Throw(inter.CurrentFileName, reason, x, y)
@@ -214,6 +217,11 @@ var (
 					objectsMap := sigmaMustAssert[*yks.Map](workspaceObj.Get("Objects"))
 					if objectsMap.DataType != "any" {
 						yks.Throw(inter.CurrentFileName, "Field Objects must be a table with datatype 'any', not '%s'", x, y, objectsMap.DataType)
+					}
+
+					customUniformsMap := sigmaMustAssert[*yks.Map](workspaceObj.Get("CustomUniforms"))
+					if customUniformsMap.DataType != "any" {
+						yks.Throw(inter.CurrentFileName, "Field CustomUniforms must be a table with datatype 'any', not '%s'", x, y, objectsMap.DataType)
 					}
 
 					shaderProgramObj := sigmaMustAssert[*yks.StructObject](workspaceObj.Get("ShaderProgram"))
@@ -289,6 +297,19 @@ var (
 						Objects: objects,
 
 						ScriptWorkspace: workspaceObj,
+
+						CustomUniforms: make(map[string]*CustomUniform, customUniformsMap.Len()),
+					}
+
+					for k, customUniform := range customUniformsMap.AllFromFront() {
+						name, ok := k.(string)
+						if !ok {
+							continue
+						}
+
+						value := customUniform.Get()
+
+						workspace.SetCustomUniform(name, value)
 					}
 
 					mainGame.AddWorkspace(workspace)
@@ -579,6 +600,67 @@ var (
 					camera.ScriptCamera = cameraObj
 
 					return []any{cameraObj}
+				}),
+			},
+
+			{
+				Identifier: "HasMesh",
+				DataType:   "func",
+				Method:     true,
+
+				//* HasMesh
+				Func: yks.NewFTemp("HasMesh", func(v ...any) []any {
+					yks.ArgsCheck(v, 1, 1, "string")
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					name := v[0].(string)
+
+					return []any{mainGame.GetMesh(name) != nil}
+				}),
+			},
+
+			{
+				Identifier: "GetMesh",
+				DataType:   "func",
+				Method:     true,
+
+				//* GetMesh
+				Func: yks.NewFTemp("GetMesh", func(v ...any) []any {
+					yks.ArgsCheck(v, 1, 1, "string")
+
+					x, y := v[0].(int), v[1].(int)
+					inter := v[2].(*yks.Interpreter)
+
+					v = v[yks.BUILTIN_SPECIALS:]
+
+					name := v[0].(string)
+
+					mesh := mainGame.GetMesh(name)
+					if mesh == nil {
+						return []any{nil}
+					}
+
+					if mesh.ScriptMesh != nil {
+						return []any{mesh.ScriptMesh}
+					}
+
+					structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Mesh"))
+					if !ok {
+						return []any{nil}
+					}
+
+					meshObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+						"Name": {
+							Identifier: "Name",
+							DataType:   "string",
+							Value:      yks.CLPTR(inter.CurrentScope, "string", name, x, y),
+						},
+					})
+
+					mesh.ScriptMesh = meshObj
+
+					return []any{meshObj}
 				}),
 			},
 		},
@@ -905,6 +987,116 @@ var (
 			return []any{shadowMapObj}
 		}},
 
+		{Key: "NewCubeMap", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 1, 1, "table")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			pathesMap := v[0].(*yks.Map)
+			if pathesMap.DataType != "string" {
+				yks.Throw(inter.CurrentFileName, "Pathes argument must be a table with data type string.", x, y)
+			}
+
+			pathes := [6]string{}
+
+			i := 0
+			for _, v := range pathesMap.AllFromFront() {
+				if i >= 6 {
+					break
+				}
+
+				pathes[i] = v.StringValue
+				i++
+			}
+
+			cubeMap := newCubeMapFromFile(pathes)
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("CubeMap"))
+			if !ok {
+				return []any{nil}
+			}
+
+			cubeMapObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"texture": {
+					Identifier: "texture",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", cubeMap.texture, x, y),
+				},
+				"unit": {
+					Identifier: "unit",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", cubeMap.unit, x, y),
+				},
+				"width": {
+					Identifier: "width",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", int32(cubeMap.Bounds.Dx()), x, y),
+				},
+				"height": {
+					Identifier: "height",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", int32(cubeMap.Bounds.Dy()), x, y),
+				},
+			})
+
+			return []any{cubeMapObj}
+		}},
+
+		{Key: "NewTexture2D", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 2, 2, "string", "u32")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			path := v[0].(string)
+			unit := v[1].(uint32)
+
+			texture2D := newTextureFromFile(path, gl.TEXTURE0+unit)
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("Texture2D"))
+			if !ok {
+				return []any{nil}
+			}
+
+			texture2DObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"texture": {
+					Identifier: "texture",
+					DataType:   "u32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", texture2D.texture, x, y),
+				},
+				"textureUnit": {
+					Identifier: "textureUnit",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "u32", unit, x, y),
+				},
+				"width": {
+					Identifier: "width",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", int32(texture2D.Bounds.Dx()), x, y),
+				},
+				"height": {
+					Identifier: "height",
+					DataType:   "i32",
+
+					Value: yks.CLPTR(inter.CurrentScope, "i32", int32(texture2D.Bounds.Dy()), x, y),
+				},
+			})
+
+			return []any{texture2DObj}
+		}},
+
 		{Key: "NewMeshObject", Val: func(v ...any) []any {
 			yks.ArgsCheck(v, 2, 2, "string", "Mesh")
 
@@ -1118,6 +1310,75 @@ var (
 			mainGame.AddObject(name, meshObject)
 
 			return []any{meshObjectObj}
+		}},
+
+		{Key: "NewCubeMapObject", Val: func(v ...any) []any {
+			yks.ArgsCheck(v, 3, 3, "string", "Mesh", "CubeMap")
+
+			x, y := v[0].(int), v[1].(int)
+			inter := v[2].(*yks.Interpreter)
+
+			v = v[yks.BUILTIN_SPECIALS:]
+
+			name := v[0].(string)
+
+			meshObj := v[1].(*yks.StructObject)
+			ok, reason := meshObj.CheckFormat([2]string{"Name", "string"})
+			if !ok {
+				yks.Throw(inter.CurrentFileName, reason, x, y)
+			}
+
+			cubeMapObj := v[2].(*yks.StructObject)
+			ok, reason = cubeMapObj.CheckFormat([2]string{"texture", "u32"}, [2]string{"unit", "i32"}, [2]string{"width", "i32"}, [2]string{"height", "i32"})
+			if !ok {
+				yks.Throw(inter.CurrentFileName, reason, x, y)
+			}
+
+			structure, ok := sigmaAssertB[*yks.Structure](inter.CurrentScope.Get("CubeMapObject"))
+			if !ok {
+				return []any{nil}
+			}
+
+			mesh := mainGame.GetMesh(sigmaMustAssert[string](meshObj.Get("Name")))
+			if mesh == nil {
+				return []any{nil}
+			}
+
+			cubeMap := CubeMap{
+				texture: sigmaMustAssert[uint32](cubeMapObj.Get("texture")),
+				unit:    sigmaMustAssert[int32](cubeMapObj.Get("unit")),
+				Bounds:  image.Rect(0, 0, int(sigmaMustAssert[int32](cubeMapObj.Get("width"))), int(sigmaMustAssert[int32](cubeMapObj.Get("height")))),
+			}
+
+			cubeMapObject := newCubeMapObject(mesh, cubeMap)
+
+			cubemapObjectObj := makeStructObjectFromStructure(structure, map[string]*yks.Field{
+				"Name": {
+					Identifier: "Name",
+					DataType:   "string",
+
+					Value: yks.CLPTR(inter.CurrentScope, "string", name, x, y),
+				},
+
+				"Mesh": {
+					Identifier: "Mesh",
+					DataType:   "Mesh",
+
+					Value: yks.CLPTR(inter.CurrentScope, "Mesh", meshObj, x, y),
+				},
+				"CubeMap": {
+					Identifier: "CubeMap",
+					DataType:   "CubeMap",
+
+					Value: yks.CLPTR(inter.CurrentScope, "CubeMap", cubeMapObj, x, y),
+				},
+			})
+
+			cubeMapObject.ScriptCubeMapObject = cubemapObjectObj
+
+			mainGame.AddObject(name, cubeMapObject)
+
+			return []any{cubemapObjectObj}
 		}},
 
 		{Key: "OS_NAME", Val: func(v ...any) []any {

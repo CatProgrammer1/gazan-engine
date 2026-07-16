@@ -1,13 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"gl/yks"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"unsafe"
 
 	"github.com/go-gl/gl/v4.3-core/gl"
@@ -30,17 +30,27 @@ func checkGLError(where string) {
 	}
 }
 
+type GameConfig struct {
+	MeshesToLoad []string
+}
+
+func loadConfig() {
+	data, err := os.ReadFile("config.json")
+	if err != nil {
+		warn("No config found.")
+		return
+	}
+
+	err = json.Unmarshal(data, &config)
+	if err != nil {
+		warn(fmt.Sprintf("Error occured while loading config: '%s'.", err.Error()))
+	}
+}
+
 var (
 	mainGame *Game
 
-	meshesToLoad = []string{
-		/*"shit/hata.glb",
-		"shit/cube_metal.glb",
-		"shit/plate.glb",
-		"shit/pig twerk fix 2.glb",
-		"shit/kolt.glb",
-		"shit/artem.glb",*/
-	}
+	config GameConfig
 
 	workspace = make(map[string]Object)
 
@@ -154,6 +164,7 @@ $env:CGO_LDFLAGS="-L C:\msys64\mingw64\lib"
 */
 
 func main() {
+	loadConfig()
 
 	runtime.LockOSThread()
 
@@ -331,7 +342,7 @@ func main() {
 
 	//skyViewLocation, skyProjectionLocation, cubeMapLocation := shaderSkyProgram.GetUniformLocation(ViewMatrixUniform), shaderSkyProgram.GetUniformLocation(ProjectionMatrixUniform), shaderSkyProgram.GetUniformLocation("skybox")
 
-	skyVertices := []Vertex{
+	cubeVertices := []Vertex{
 		// BACK (-Z)
 		{[3]float32{-1.0, -1.0, -1.0}, [3]float32{0.0, 0.0, -1.0}, [2]float32{0, 0}, [4]uint8{0, 0, 0, 0}, [4]float32{0, 0, 0, 0}, [4]float32{0, 0, 0, 0}},
 		{[3]float32{-1.0, 1.0, -1.0}, [3]float32{0.0, 0.0, -1.0}, [2]float32{0.0, 1.0}, [4]uint8{0, 0, 0, 0}, [4]float32{0, 0, 0, 0}, [4]float32{0, 0, 0, 0}},
@@ -393,13 +404,13 @@ func main() {
 
 	glfw.SwapInterval(0)
 
-	skybox3D := newMesh(skyVertices, nil, nil, gl.STATIC_DRAW,
+	cube3D := newMesh(cubeVertices, nil, nil, gl.STATIC_DRAW,
 		Attribute{0, 3, gl.FLOAT, false, vertexStride, 0},
 	)
-	defer skybox3D.Delete()
+	defer cube3D.Delete()
 
 	go func() {
-		for _, meshPath := range meshesToLoad {
+		for _, meshPath := range config.MeshesToLoad {
 			loadedMesh := newMeshFromFile(meshPath, gl.STATIC_DRAW, true,
 				Attribute{0, 3, gl.FLOAT, false, vertexStride, 0},
 				Attribute{1, 3, gl.FLOAT, false, vertexStride, uintptr(3 * 4)},
@@ -460,6 +471,9 @@ func main() {
 	mainGame.LightTypeShadowMapIndex[0] = 0
 	mainGame.LightTypeShadowMapIndex[1] = 1
 	mainGame.LightTypeShadowMapIndex[2] = 2
+
+	cube3D.Name = "cube3D"
+	mainGame.AddMesh(cube3D)
 
 	/*mainWorkspace := &Workspace{
 		Name: "main",
@@ -574,14 +588,15 @@ func main() {
 		select {
 		case newLoadedMesh := <-loadedMeshes:
 			fmt.Printf("::LOADED NEW MESH - '%s';\n", newLoadedMesh.Name)
-			meshPath := newLoadedMesh.Name
 
-			base := filepath.Base(meshPath)
-			ext := filepath.Ext(meshPath)
+			mainGame.AddMesh(newLoadedMesh)
 
-			workspace[strings.TrimSuffix(base, ext)] = newMeshObject(newLoadedMesh, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{1, 1, 1}, mgl32.QuatIdent())
+			//base := filepath.Base(meshPath)
+			//ext := filepath.Ext(meshPath)
 
-			meshCache[newLoadedMesh.VAO] = newLoadedMesh
+			//workspace[strings.TrimSuffix(base, ext)] = newMeshObject(newLoadedMesh, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{1, 1, 1}, mgl32.QuatIdent())
+
+			//meshCache[newLoadedMesh.VAO] = newLoadedMesh
 		default:
 		}
 

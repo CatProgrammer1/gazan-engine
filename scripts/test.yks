@@ -23,11 +23,24 @@ yar shadowMapDir ShadowMap = NewShadowMap(depthProgram, "dirShadowMap", maxShado
 yar shadowMapSpot ShadowMap = NewShadowMap(depthProgram, "spotShadowMap", maxShadowResolution/3?i32, 1?i32, 1?u32)
 yar shadowMapPoint ShadowMap = NewShadowCubeMap(depthProgramPoint, "pointShadowMap", maxShadowResolution/3?i32, 1?i32, 2?u32)
 
+yar vertexShaderSky Shader = LoadShader("shaders/sky.vs", GL_VERTEX_SHADER)
+yar fragShaderSky Shader = LoadShader("shaders/sky.fs", GL_FRAGMENT_SHADER)
+
+yar skyboxProgram ShaderProgram = MakeShaderProgram([vertexShaderSky, fragShaderSky,] <- Shader)
+
 game->AddShadowMap(shadowMapDir) /*type: 0*/
 game->AddShadowMap(shadowMapPoint) /*type: 1*/
 game->AddShadowMap(shadowMapSpot) /*type: 2*/
 
-yar b Light = NewPointLight(new Vec3{
+yar b Light = NewDirectionalLight(new Vec3{
+    X: -1,
+    Y: -1,
+    Z: 0.5,
+}, new Vec3{
+    X: 2,
+    Y: 2,
+    Z: 2,
+}) /*NewPointLight(new Vec3{
     X: 0,
     Y: 4,
     Z: 0,
@@ -35,28 +48,29 @@ yar b Light = NewPointLight(new Vec3{
     X: 2,
     Y: 2,
     Z: 2,
-}, 20.0)
-/*yar b Light = NewDirectionalLight(new Vec3{
-    X: -0.3,
-    Y: -1,
-    Z: 0.5,
-}, new Vec3{
-    X: 2,
-    Y: 2,
-    Z: 2,
-})*/
+}, 20.0)*/
 
+yar skyboxpath string = "shit/китик-512x512.jpg"
+
+yar skybox CubeMap = NewCubeMap([skyboxpath, skyboxpath, skyboxpath, skyboxpath, skyboxpath, skyboxpath,] <- string)
 
 yar workspace Workspace = NewWorkspace("main", true, shaderProgram)
 
+workspace->CustomUniforms = [
+    "environment": skybox,
+] <- any
+
+yar skyboxWorkspace Workspace = NewWorkspaceEx("skybox", false, skyboxProgram, [
+    GL_DEPTH_TEST,
+] <- u32, [
+    GL_CULL_FACE,
+] <- u32, false, GL_LEQUAL, 0, 0, GL_FRONT , [] <- any)
+
+yar skyboxObject CubeMapObject = NewCubeMapObject("skybox", default_cube_mesh, skybox)
+
+skyboxWorkspace->AddObject(skyboxObject)
+
 yar mesh Mesh = LoadMesh("shit/plate.glb")
-
-yar meshCube Mesh = LoadMesh("shit/cube_metal.glb")
-
-yar meshCube MeshObject = NewMeshObject("cube", meshCube)
-meshCube->Position = new Vec3{
-    X: -6, Y: 1, Z: 0,
-}
 
 yar meshObject MeshObject = NewMeshObject("sigma", mesh)
 meshObject->Scale = new Vec3{
@@ -72,7 +86,7 @@ meshObject2->Position = new Vec3{
 }
 
 /*yar animation Animation = meshObject->Animations[2]
-
+ 
 animation->Looped = false
 animation->Play()*/
 
@@ -85,15 +99,23 @@ game->ListenInput(KEY_LEFT_CONTROL, false)
 
 workspace->AddObject(meshObject)
 workspace->AddObject(meshObject2)
-workspace->AddObject(meshCube)
+
+yar metalCube Mesh = LoadMesh("shit/cube_metal.glb")
+yar metalCubeObject MeshObject = NewMeshObject("cubemetal", metalCube)
+/*workspace->AddObject(meshCube)*/
+
+workspace->AddObject(metalCubeObject)
 
 game->AddWorkspace(workspace)
+game->AddWorkspace(skyboxWorkspace)
 
 game->AddLightSrc(b)
 
 yar camera Camera = game->GetCamera()
 
 yar delta f32 = 0.0
+
+yar last i64 = time()
 
 func Update(d f32) {
     delta = d
